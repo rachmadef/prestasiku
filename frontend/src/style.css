@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-navy: #001D60;
+  --color-brand-blue: #1062A7;
+  --color-brand-gold: #F8B700;
+  --color-brand-surface: #F3F1EF;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-brand-surface);
+  color: #1e293b;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Glass & Card Utilities */
+.card-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -10px rgba(0, 29, 96, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+}
+
+.glow-navy {
+  box-shadow: 0 10px 25px -5px rgba(0, 29, 96, 0.25);
+}
+
+.glow-gold {
+  box-shadow: 0 10px 25px -5px rgba(248, 183, 0, 0.35);
+}

@@ -1,0 +1,273 @@
+Rancangan Sistem PrestasiKu — Versi 2
+Platform Manajemen Kompetisi & Prestasi Pelajar SLTP/SLTALaravel 13 + Vue 3 + Tailwind CSS 4
+1. Ringkasan Konsep
+PrestasiKu adalah platform web umum untuk menemukan, memverifikasi, mendaftarkan, mengelola, dan mendokumentasikan kompetisi serta prestasi pelajar tingkat SLTP/SLTA. Platform bersifat multi-tenant sehingga dapat digunakan oleh banyak sekolah/instansi dengan isolasi data yang ketat.
+Cakupan kompetisi: tingkat provinsi dan nasional.
+Informasi kompetisi dapat dikumpulkan dari penyelenggara, website resmi, surat/panduan, media sosial resmi, dan berita terkait.
+Informasi dari media sosial atau berita tidak otomatis dianggap resmi sebelum proses verifikasi.
+Publik dapat melihat kompetisi yang sedang dibuka, bulan berjalan, dan bulan berikutnya.
+2. Keunikan / Nilai Pembeda PrestasiKu
+Keunikan
+Penjelasan
+Verified Competition Database
+Setiap kompetisi memiliki status verifikasi, sumber, tanggal verifikasi, dan verifier.
+Satu Alur Lomba → Prestasi
+Menemukan lomba → eligibility → pendaftaran → mengikuti → hasil → verifikasi prestasi.
+Multi-Tenant Sekolah
+Banyak sekolah menggunakan satu platform dengan isolasi data per sekolah.
+Eligibility Engine
+Pemeriksaan jenjang, kelas, usia, wilayah, kategori, dan aturan lomba.
+Dynamic Form
+Form kebutuhan tiap kompetisi dapat dikustomisasi tanpa mengubah source code.
+Achievement Verification + QR
+Prestasi memiliki dokumen pendukung dan dapat diverifikasi melalui QR/public ID.
+Privacy-by-Default
+Data siswa dan prestasi privat secara default; publikasi dilakukan berdasarkan izin.
+School Operations Center
+Siswa, approval, delegasi, surat tugas, import data, laporan, dan arsip prestasi.
+Competition Intelligence
+Kalender, deadline, bookmark, filter, dan rekomendasi berbasis aturan.
+Data Agregat
+Statistik kompetisi/prestasi dapat dibuat tanpa membuka identitas pribadi.
+3. Role Pengguna
+Role
+Tanggung Jawab
+Super Admin
+Verifikasi sekolah, kompetisi dan organizer; moderasi; audit; keamanan; laporan; konfigurasi form; monitoring.
+Admin Sekolah/Instansi
+Mengelola sekolah, siswa, pendaftaran, approval, tim/delegasi, prestasi, dokumen, import dan laporan.
+Siswa
+Melihat kompetisi, eligibility, bookmark, mendaftar, memantau status, serta melihat riwayat lomba dan prestasi.
+4. Modul Utama
+Public Competition Directory dan kalender kompetisi.
+Organizer Management dan verifikasi sumber.
+Registrasi dan approval sekolah.
+Student Management.
+Competition Registration.
+Dynamic Form Builder.
+Eligibility Engine.
+Team/Delegation Management.
+Achievement Management dan verification.
+QR/Public Achievement Verification.
+Notification Center.
+Dashboard Super Admin, Sekolah, dan Siswa.
+Import siswa CSV/XLSX dengan preview dan validasi.
+Audit log dan security monitoring.
+5. Workflow Verifikasi Kompetisi
+Status
+Makna
+Draft
+Data masih disusun.
+Menunggu Verifikasi
+Sumber dan informasi sedang diperiksa.
+Terverifikasi Sumber
+Sumber resmi/pendukung telah diperiksa.
+Resmi & Dipublikasikan
+Kompetisi boleh tampil sebagai informasi resmi.
+Dibatalkan
+Kompetisi dibatalkan berdasarkan informasi terverifikasi.
+Ditolak
+Tidak memenuhi standar verifikasi.
+Kadaluarsa
+Periode pendaftaran/acara telah lewat.
+Data kompetisi disarankan memiliki official URL, website organizer, media sosial resmi, surat/panduan/poster, tanggal verifikasi, verifier, dan catatan verifikasi.
+6. Dynamic Form Builder
+Field: text, textarea, number, date, select, radio, checkbox, file, email, phone, NIS, dan lainnya.
+Required/optional, validation, conditional field, dan batas ukuran file.
+Versioning form.
+registration menyimpan form_version_id agar jawaban historis konsisten.
+Form dapat digunakan untuk kebutuhan berbeda setiap kompetisi/sekolah.
+7. Prestasi dan Verifikasi
+Status: Draft → Menunggu Verifikasi → Terverifikasi → Ditolak.
+Dokumen pendukung: sertifikat, SK, surat, tautan hasil, atau dokumentasi.
+Gunakan public ID seperti PKU-2026-XXXXXX, bukan NIS/NISN.
+QR verification hanya menampilkan data publik yang diizinkan.
+Profil prestasi publik bersifat opt-in.
+8. Privasi Siswa
+Profil dan prestasi siswa private by default.
+Jangan menjadikan pencarian NIS sebagai akses publik ke seluruh riwayat.
+NIS/NISN bukan credential publik.
+Gunakan public_id terpisah untuk verifikasi.
+Dokumen pribadi disimpan pada private storage.
+Akses dokumen menggunakan authorization dan temporary/signed URL.
+Minimalkan data yang ditampilkan pada halaman publik.
+9. Struktur Database Inti
+Entity
+Fungsi
+users
+Akun autentikasi dan metadata keamanan.
+roles / permissions / role_permissions
+RBAC.
+schools
+Data sekolah/tenant.
+school_registrations
+Pengajuan pendaftaran sekolah.
+students
+Data siswa.
+organizers
+Data penyelenggara.
+competitions
+Data kompetisi dan jadwal.
+competition_categories
+Kategori lomba.
+competition_sources
+Sumber/bukti verifikasi.
+competition_eligibilities
+Aturan kelayakan.
+competition_forms / form_fields
+Dynamic form dan field.
+registrations / registration_answers
+Pendaftaran dan jawaban.
+teams / team_members
+Tim/delegasi.
+achievements
+Rekam prestasi.
+achievement_documents
+Dokumen prestasi.
+documents
+Metadata file.
+notifications
+Notifikasi.
+audit_logs
+Jejak aktivitas.
+login_events
+Audit keamanan login.
+imports
+Riwayat import.
+school_approvals
+Approval internal.
+competition_approvals
+Verifikasi/approval kompetisi.
+10. Field Penting
+users.must_change_password, password_changed_at, last_login_at
+schools.status
+students.public_id, public_profile_enabled, status
+competitions.requires_school_approval, participation_type, verification_status, visibility, published_at
+competitions.registration_open_at, registration_deadline, event_start_at, event_end_at, result_published_at
+organizers.verification_status
+competition_forms.version
+registrations.form_version_id
+11. Keamanan Tingkat Tinggi
+Laravel Sanctum untuk SPA/API authentication.
+Laravel Policies/Gates dan Spatie Permission untuk authorization.
+Tenant isolation berdasarkan school_id/tenant_id.
+Backend wajib memvalidasi kepemilikan data; jangan percaya school_id dari frontend.
+Perlindungan IDOR/BOLA pada seluruh endpoint.
+Password hashing Argon2id atau bcrypt.
+Password awal 1234 hanya credential sementara; wajib ganti saat login pertama. Untuk produksi lebih aman memakai password acak + activation link.
+HTTPS, HSTS, security headers, CORS terbatas, CSRF protection.
+Rate limiting untuk login, reset password, API sensitif, dan endpoint publik.
+Private file storage, authorization, dan signed/temporary URLs.
+Validasi MIME, ekstensi, ukuran, dan isi file.
+Audit log untuk aktivitas penting.
+Backup terenkripsi, restore drill, dan disaster recovery.
+Secret/API key tidak boleh disimpan di repository.
+Transaction untuk workflow kritis.
+Security testing lintas sekolah untuk memastikan tenant isolation.
+12. Stack Teknologi & Library
+Layer
+Pilihan
+Backend
+Laravel 13 + PHP 8.4+
+Frontend
+Vue 3 + Vite
+CSS/UI
+Tailwind CSS 4
+State
+Pinia
+Routing
+Vue Router
+HTTP
+Axios
+Authentication
+Laravel Sanctum
+Authorization
+Laravel Policies/Gates + Spatie Laravel Permission
+Database
+MySQL 8+ / MariaDB
+Cache/Queue
+Redis + Laravel Queue
+Excel/CSV
+maatwebsite/excel
+Testing Backend
+Pest / PHPUnit
+Testing Frontend
+Vitest + Vue Test Utils
+E2E
+Playwright
+Static Analysis
+PHPStan/Larastan
+API Documentation
+Scramble/Scribe
+Development Monitoring
+Laravel Telescope
+Production Monitoring
+Error monitoring + server monitoring
+13. Contoh API Awal
+Endpoint
+Fungsi
+POST /api/v1/auth/login
+Login
+POST /api/v1/auth/logout
+Logout
+GET /api/v1/competitions
+Daftar kompetisi
+GET /api/v1/competitions/{id}
+Detail kompetisi
+GET /api/v1/competitions/{id}/eligibility
+Cek kelayakan
+POST /api/v1/competitions/{id}/bookmark
+Bookmark
+POST /api/v1/registrations
+Membuat pendaftaran
+GET /api/v1/student/registrations
+Riwayat pendaftaran
+GET /api/v1/student/achievements
+Riwayat prestasi
+GET /api/v1/school/students
+Data siswa sekolah
+POST /api/v1/school/imports/students
+Import siswa
+POST /api/v1/admin/competitions/{id}/verify
+Verifikasi kompetisi
+GET /api/v1/verify/{public_id}
+Verifikasi publik non-sensitif
+14. Struktur Project
+Backend:app/Modelsapp/Http/Controllersapp/Http/Requestsapp/Policiesapp/Servicesapp/Actionsapp/Jobsapp/Notificationsapp/Rulesdatabase/migrationsroutes/api.phpFrontend:resources/js/componentsresources/js/layoutsresources/js/pagesresources/js/routerresources/js/storesresources/js/servicesresources/js/composablesresources/js/typesTesting:tests/Featuretests/UnitVitestPlaywright
+15. Dashboard
+Super Admin: sekolah pending, kompetisi pending verifikasi, aktivitas, security events, statistik, dan audit.
+Admin Sekolah: siswa aktif, pendaftaran pending, kompetisi aktif, deadline, prestasi, tim/delegasi, dan laporan.
+Siswa: kompetisi relevan, deadline, bookmark, pendaftaran saya, status, dan riwayat prestasi.
+16. Roadmap
+Tahap
+Fitur
+MVP
+Auth/RBAC, sekolah & approval, siswa, competition database, verification, registration, dashboard, audit log, tenant isolation.
+V1
+Dynamic Form, import Excel, prestasi, calendar, notification center, internal approval.
+V2
+Teams/delegations, surat tugas otomatis, QR verification, public profile opt-in, recommendation engine.
+V3
+WhatsApp notification, PWA/mobile, aggregate statistics, AI-assisted competition discovery.
+17. QA & Testing
+Feature test untuk workflow sekolah, siswa, kompetisi, approval, dan prestasi.
+Authorization test: Admin Sekolah A tidak boleh membaca/mengubah data Sekolah B.
+Validation test dynamic forms dan file upload.
+Security test untuk IDOR/BOLA, rate limit, session, file upload, dan privilege escalation.
+E2E test alur utama dengan Playwright.
+Backup restore test secara berkala.
+18. Urutan Implementasi
+Finalisasi business rules dan status entity.
+Finalisasi ERD dan permission matrix.
+Migration, model, dan relationship Laravel.
+Authentication dan tenant authorization.
+Modul sekolah dan siswa.
+Competition, organizer, dan source verification.
+Registration dan dynamic forms.
+Achievement, verification, dan QR.
+Dashboard dan notification center.
+Testing, hardening, deployment, monitoring, dan dokumentasi.
+19. Kesimpulan
+PrestasiKu diarahkan menjadi platform yang menghubungkan discovery kompetisi, administrasi pendaftaran sekolah/siswa, dan pengelolaan rekam prestasi. Keunikan utamanya adalah database kompetisi terverifikasi, eligibility otomatis, multi-tenant sekolah, dynamic form, verifikasi prestasi, QR verification, dan privacy-by-default. Arsitektur ini memungkinkan pengembangan bertahap dari aplikasi operasional sekolah menjadi ekosistem data kompetisi dan prestasi pelajar.
+20. Catatan Pengembangan
+Dokumen ini adalah rancangan sistem yang dapat diedit. Aturan eligibility, format dokumen, status workflow, field final, kebijakan retensi, dan desain UI perlu difinalisasi sebelum migration production dibuat.

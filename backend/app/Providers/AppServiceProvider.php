@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Providers;
+
+use App\Models\School;
+use App\Models\Student;
+use App\Policies\SchoolPolicy;
+use App\Policies\StudentPolicy;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        //
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        Gate::policy(Student::class, StudentPolicy::class);
+        Gate::policy(School::class, SchoolPolicy::class);
+        Gate::policy(\App\Models\Registration::class, \App\Policies\RegistrationPolicy::class);
+        Gate::policy(\App\Models\Achievement::class, \App\Policies\AchievementPolicy::class);
+    }
+}

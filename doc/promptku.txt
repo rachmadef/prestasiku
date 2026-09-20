@@ -1,0 +1,19 @@
+saya ingin membuat sebuah aplikasi website untuk pendaftaran lomba di sekolah tingkat SLTA atau SLTP secara umum bukan untuk salah satu instansi. saya ingin pendaftaran lomba yang disediakan merupakan lomba resmi yang diadakan oleh instansi yang sudah terdaftar di https://pusatprestasinasional.kemendikdasmen.go.id/ 
+
+untuk fitur lain saya juga ingin menampilkan lomba apa saja yang tersedia di bulan ini atau bulan yang akan datang. untuk informasi lombanya bisa di cari via instagram, atau berita-berita terkait. cakupan lombanya adalah tingkat nasional dan provinsi. karena website ini sifatnya umum jadi akan ada 3 role utama yaitu Super Admin (si penyedia atau pengelola website), Admin (setiap instansi sekolah yang sudah daftar), siswa(berdasarkaan nis yang sudah di inputkan oleh admin sekolah). berikut ini saya jelaskan terkait tugas setiap role
+
+Super Admin
+
+tugas nya adalah mengonfirmasi setiap instansi yang ingin menggunakan aplikasi ini, untuk awal aplikasi ini bisa digunakan secara gratis. super admin bisa mengelola semua fitur yang ada di website ini serta memantau semua aktivitas admin setiap instansi. ada fitur tambahan di super admin yaitu menyediakan formulir yang bisa di custom sendiri oleh admin agar sesuai dengan kebutuhan setiap sekolah ketika di lapangan
+
+Admin Sekolah/Instansi
+
+Setiap sekolah yang ingin menggunakan aplikasi ini harus mendaftarkan dan mengisi formulir yang disediakan. selanjutnya admin menunggu hasil pendaftarannya apakah sudah di setujui super admin atau belum, jika sudah maka admin bisa login dan menggunakan fitur yang tersedia. kemudian admin juga bisa membuat formulir sendiri sesuai kebutuhan di lapangan. kemudian admin juga bisa menambahkan data siswa nya agar siswa bisa terdata di database pusat aplikasi nya sesuai sekoalh/instansi yang bertanggung jawab.
+
+Siswa
+
+semua siswa yang sudah terdata di database bisa melakukan pendaftaran lomba yang ingin di ikuti dan akan tercatat dan terkumpul di database, ketika siswa tersebut mencari nama atau nisnya maka akan muncul prestasi dan riwayat lomba nya. saya berencana juga membuat dashboard untuk siswa agar bisa lebih menjaga privasinya dan untuk password default nya gunakan saja "1234" setelah siswa login untuk pertama kali saya ingin langsung memberikan pop up peringatan untuk segera mengganti password nya demi keamanan data nya.
+
+
+
+saya ingin membangun website ini menggunakan laravel13 + vue js + tailwindcss. tolong bantu membuatkan file pdf rancangan sistem website yang bernama PrestasiKu ini. sertakan juga daftar library dan plugin yang digunakan serta struktur database dan sistem keamanan yang sangat ketat karena aplikasi website ini  berisi data yang sangat penting

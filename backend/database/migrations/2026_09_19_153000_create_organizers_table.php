@@ -1,0 +1,46 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('organizers', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->enum('type', [
+                'kementerian',
+                'dinas_pendidikan',
+                'perguruan_tinggi',
+                'organisasi_profesi',
+                'swasta',
+                'komunitas',
+                'lainnya',
+            ])->default('kementerian');
+            $table->string('website')->nullable();
+            $table->string('instagram')->nullable();
+            $table->string('email')->nullable();
+            $table->string('phone', 25)->nullable();
+            $table->enum('verification_status', ['unverified', 'verified', 'official'])->default('unverified');
+            $table->timestamp('verified_at')->nullable();
+            $table->foreignId('verified_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('verification_notes')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('organizers');
+    }
+};

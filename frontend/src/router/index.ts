@@ -1,0 +1,201 @@
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const routes: RouteRecordRaw[] = [
+  // -----------------------------------------------------------------
+  // Public Routes
+  // -----------------------------------------------------------------
+  {
+    path: '/',
+    name: 'landing',
+    component: () => import('@/views/public/LandingView.vue'),
+  },
+  {
+    path: '/competitions',
+    name: 'competitions.catalog',
+    component: () => import('@/views/public/CompetitionCatalogView.vue'),
+  },
+  {
+    path: '/competitions/:slug',
+    name: 'competitions.detail',
+    component: () => import('@/views/public/CompetitionDetailView.vue'),
+  },
+  {
+    path: '/verify/:public_id?',
+    name: 'verify',
+    component: () => import('@/views/public/PublicVerificationView.vue'),
+  },
+  {
+    path: '/school-registration',
+    name: 'school-registration',
+    component: () => import('@/views/public/SchoolRegistrationView.vue'),
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/views/auth/LoginView.vue'),
+    meta: { guestOnly: true },
+  },
+  {
+    path: '/force-change-password',
+    name: 'force-change-password',
+    component: () => import('@/views/auth/ForceChangePasswordView.vue'),
+    meta: { requiresAuth: true },
+  },
+
+  // -----------------------------------------------------------------
+  // Super Admin Routes
+  // -----------------------------------------------------------------
+  {
+    path: '/admin',
+    redirect: '/admin/dashboard',
+    meta: { requiresAuth: true, role: 'super_admin' },
+    children: [
+      {
+        path: 'dashboard',
+        name: 'admin.dashboard',
+        component: () => import('@/views/admin/AdminDashboardView.vue'),
+      },
+      {
+        path: 'schools',
+        name: 'admin.schools',
+        component: () => import('@/views/admin/AdminSchoolsView.vue'),
+      },
+      {
+        path: 'competitions',
+        name: 'admin.competitions',
+        component: () => import('@/views/admin/AdminCompetitionsView.vue'),
+      },
+      {
+        path: 'organizers',
+        name: 'admin.organizers',
+        component: () => import('@/views/admin/AdminOrganizersView.vue'),
+      },
+      {
+        path: 'categories',
+        name: 'admin.categories',
+        component: () => import('@/views/admin/AdminCategoriesView.vue'),
+      },
+    ],
+  },
+
+  // -----------------------------------------------------------------
+  // School Admin Routes
+  // -----------------------------------------------------------------
+  {
+    path: '/school',
+    redirect: '/school/dashboard',
+    meta: { requiresAuth: true, role: 'school_admin' },
+    children: [
+      {
+        path: 'dashboard',
+        name: 'school.dashboard',
+        component: () => import('@/views/school/SchoolDashboardView.vue'),
+      },
+      {
+        path: 'students',
+        name: 'school.students',
+        component: () => import('@/views/school/SchoolStudentsView.vue'),
+      },
+      {
+        path: 'registrations',
+        name: 'school.registrations',
+        component: () => import('@/views/school/SchoolRegistrationsView.vue'),
+      },
+      {
+        path: 'achievements',
+        name: 'school.achievements',
+        component: () => import('@/views/school/SchoolAchievementsView.vue'),
+      },
+    ],
+  },
+
+  // -----------------------------------------------------------------
+  // Student Routes
+  // -----------------------------------------------------------------
+  {
+    path: '/student',
+    redirect: '/student/dashboard',
+    meta: { requiresAuth: true, role: 'student' },
+    children: [
+      {
+        path: 'dashboard',
+        name: 'student.dashboard',
+        component: () => import('@/views/student/StudentDashboardView.vue'),
+      },
+      {
+        path: 'competitions',
+        name: 'student.competitions',
+        component: () => import('@/views/student/StudentCompetitionsView.vue'),
+      },
+      {
+        path: 'registrations',
+        name: 'student.registrations',
+        component: () => import('@/views/student/StudentRegistrationsView.vue'),
+      },
+      {
+        path: 'achievements',
+        name: 'student.achievements',
+        component: () => import('@/views/student/StudentAchievementsView.vue'),
+      },
+    ],
+  },
+
+  // Fallback 404
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/',
+  },
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+  scrollBehavior() {
+    return { top: 0 }
+  },
+})
+
+// Navigation Guard (Vue Router 5 Return Syntax)
+router.beforeEach((to, _from) => {
+  const authStore = useAuthStore()
+
+  // 1. Guest only routes (e.g. /login)
+  if (to.meta.guestOnly && authStore.isAuthenticated) {
+    if (authStore.isSuperAdmin) return '/admin/dashboard'
+    if (authStore.isSchoolAdmin) return '/school/dashboard'
+    if (authStore.isStudent) return '/student/dashboard'
+    return '/'
+  }
+
+  // 2. Protected routes check
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
+  if (requiresAuth && !authStore.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  // 3. Force change password check
+  if (
+    authStore.isAuthenticated &&
+    authStore.requiresPasswordChange &&
+    to.path !== '/force-change-password'
+  ) {
+    return '/force-change-password'
+  }
+
+  // 4. Role checking
+  const requiredRole = to.matched.find((record) => record.meta.role)?.meta.role as string | undefined
+  if (requiredRole && authStore.user) {
+    const hasRole = authStore.user.roles.includes(requiredRole)
+    if (!hasRole) {
+      if (authStore.isSuperAdmin) return '/admin/dashboard'
+      if (authStore.isSchoolAdmin) return '/school/dashboard'
+      if (authStore.isStudent) return '/student/dashboard'
+      return '/'
+    }
+  }
+
+  return true
+})
+
+export default router
