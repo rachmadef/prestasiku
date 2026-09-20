@@ -26,6 +26,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/public/PublicVerificationView.vue'),
   },
   {
+    path: '/dispensasi/verifikasi/:token?',
+    name: 'dispensation.verify',
+    component: () => import('@/views/public/DispensationVerificationView.vue'),
+  },
+  {
     path: '/school-registration',
     name: 'school-registration',
     component: () => import('@/views/public/SchoolRegistrationView.vue'),
@@ -103,6 +108,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/school/SchoolRegistrationsView.vue'),
       },
       {
+        path: 'dispensations',
+        name: 'school.dispensations',
+        component: () => import('@/views/school/SchoolDispensationsView.vue'),
+      },
+      {
         path: 'achievements',
         name: 'school.achievements',
         component: () => import('@/views/school/SchoolAchievementsView.vue'),
@@ -122,6 +132,16 @@ const routes: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'student.dashboard',
         component: () => import('@/views/student/StudentDashboardView.vue'),
+      },
+      {
+        path: 'portfolio',
+        name: 'student.portfolio',
+        component: () => import('@/views/student/StudentPortfolioView.vue'),
+      },
+      {
+        path: 'dispensations',
+        name: 'student.dispensations',
+        component: () => import('@/views/student/StudentDispensationsView.vue'),
       },
       {
         path: 'competitions',

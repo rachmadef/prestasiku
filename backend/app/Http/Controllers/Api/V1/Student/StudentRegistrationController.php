@@ -271,4 +271,125 @@ class StudentRegistrationController extends Controller
             'data' => $registration,
         ]);
     }
+
+    /**
+     * Get student's comprehensive competition portfolio (all participations, whether won or participated/kalah).
+     */
+    public function portfolio(Request $request): JsonResponse
+    {
+        $student = $request->user()->student;
+        if (! $student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Profil siswa tidak ditemukan.',
+            ], 404);
+        }
+
+        $studentId = $student->id;
+        $query = Registration::where(function ($q) use ($studentId) {
+            $q->where('student_id', $studentId)
+                ->orWhereHas('team.members', function ($tm) use ($studentId) {
+                    $tm->where('student_id', $studentId);
+                });
+        })
+            ->with([
+                'competition:id,title,level,target_level,event_start_at,organizer_id',
+                'competition.organizer:id,name',
+                'team:id,team_name',
+            ])
+            ->latest();
+
+        $allRecords = $query->get();
+
+        $stats = [
+            'total_participations' => $allRecords->count(),
+            'total_wins' => $allRecords->where('result_status', 'winner')->count(),
+            'total_finalists' => $allRecords->where('result_status', 'finalist')->count(),
+            'total_participants' => $allRecords->where('result_status', 'participant')->count(),
+            'pending_results' => $allRecords->where('result_status', 'pending')->count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'student' => [
+                    'id' => $student->id,
+                    'full_name' => $student->full_name,
+                    'nis' => $student->nis,
+                    'class_name' => $student->class_name,
+                    'school_name' => $student->school?->name,
+                ],
+                'stats' => $stats,
+                'records' => $allRecords,
+            ],
+        ]);
+    }
+
+    /**
+     * Upload participation or result certificate by student.
+     */
+    public function uploadCertificate(Request $request, int $id): JsonResponse
+    {
+        $student = $request->user()->student;
+        $studentId = $student->id;
+
+        $registration = Registration::where(function ($q) use ($studentId) {
+            $q->where('student_id', $studentId)
+                ->orWhereHas('team.members', fn ($tm) => $tm->where('student_id', $studentId));
+        })->findOrFail($id);
+
+        $request->validate([
+            'certificate_file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'result_status' => 'nullable|in:participant,finalist,winner',
+            'rank_details' => 'nullable|string|max:100',
+        ]);
+
+        $path = $request->file('certificate_file')->store('participation_certificates', 'local');
+
+        $updateData = [
+            'certificate_file' => $path,
+        ];
+
+        if ($request->filled('result_status')) {
+            $updateData['result_status'] = $request->input('result_status');
+        }
+        if ($request->filled('rank_details')) {
+            $updateData['rank_details'] = $request->input('rank_details');
+        }
+        if (empty($registration->result_recorded_at)) {
+            $updateData['result_recorded_at'] = now();
+        }
+
+        $registration->update($updateData);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sertifikat keikutsertaan lomba berhasil diunggah.',
+            'data' => $registration->fresh(['competition:id,title']),
+        ]);
+    }
+
+    /**
+     * Download student's certificate.
+     */
+    public function downloadCertificate(Request $request, int $id)
+    {
+        $student = $request->user()->student;
+        $studentId = $student->id;
+
+        $registration = Registration::where(function ($q) use ($studentId) {
+            $q->where('student_id', $studentId)
+                ->orWhereHas('team.members', fn ($tm) => $tm->where('student_id', $studentId));
+        })->findOrFail($id);
+
+        if (! $registration->certificate_file || ! \Illuminate\Support\Facades\Storage::disk('local')->exists($registration->certificate_file)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Berkas sertifikat tidak ditemukan.',
+            ], 404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download($registration->certificate_file);
+    }
 }
+

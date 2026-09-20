@@ -64,6 +64,13 @@ class Student extends Model
         return $this->hasMany(Achievement::class);
     }
 
+    public function dispensations()
+    {
+        return $this->belongsToMany(KbmDispensation::class, 'kbm_dispensation_students', 'student_id', 'dispensation_id')
+            ->withPivot('notes')
+            ->withTimestamps();
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');

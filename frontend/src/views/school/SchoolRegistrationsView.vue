@@ -32,6 +32,16 @@ const directForm = ref({
 })
 const registering = ref(false)
 
+// Record Result Modal (Menang / Kalah / Peserta)
+const showResultModal = ref(false)
+const recordingResult = ref(false)
+const resultForm = ref({
+  result_status: 'participant',
+  rank_details: '',
+  result_notes: '',
+  certificate_file: null as File | null,
+})
+
 const studentOptions = computed(() => {
   return students.value.map((s: any) => ({
     value: s.id,
@@ -125,6 +135,69 @@ async function submitDirectRegistration() {
   }
 }
 
+function openResultModal(reg: any) {
+  selectedReg.value = reg
+  resultForm.value = {
+    result_status: reg.result_status && reg.result_status !== 'pending' ? reg.result_status : 'participant',
+    rank_details: reg.rank_details || (reg.result_status === 'winner' ? 'Juara 1' : 'Peserta'),
+    result_notes: reg.result_notes || '',
+    certificate_file: null,
+  }
+  showResultModal.value = true
+}
+
+function handleCertificateFileChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    resultForm.value.certificate_file = target.files[0]
+  }
+}
+
+async function submitResult() {
+  if (!selectedReg.value) return
+  recordingResult.value = true
+  try {
+    const formData = new FormData()
+    formData.append('result_status', resultForm.value.result_status)
+    formData.append('rank_details', resultForm.value.rank_details)
+    if (resultForm.value.result_notes) {
+      formData.append('result_notes', resultForm.value.result_notes)
+    }
+    if (resultForm.value.certificate_file) {
+      formData.append('certificate_file', resultForm.value.certificate_file)
+    }
+
+    await api.post(`/school/registrations/${selectedReg.value.id}/result`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+
+    toast.success('Hasil lomba dan arsip partisipasi siswa berhasil didokumentasikan.', 'Arsip Diperbarui')
+    showResultModal.value = false
+    fetchData()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal mencatat hasil lomba.', 'Gagal')
+  } finally {
+    recordingResult.value = false
+  }
+}
+
+async function downloadCertificate(regId: number) {
+  try {
+    const res = await api.get(`/school/registrations/${regId}/certificate`, {
+      responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `Sertifikat-Delegasi-${regId}.pdf`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  } catch (err) {
+    toast.error('Gagal mengunduh berkas sertifikat.', 'Unduh Gagal')
+  }
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -156,14 +229,15 @@ onMounted(() => {
               <tr>
                 <th class="px-6 py-3.5">Nama Siswa</th>
                 <th class="px-6 py-3.5">Kompetisi Dituju</th>
-                <th class="px-6 py-3.5">Tanggal Pengajuan</th>
+                <th class="px-6 py-3.5">Tanggal</th>
                 <th class="px-6 py-3.5">Status Delegasi</th>
-                <th class="px-6 py-3.5 text-right">Aksi Review</th>
+                <th class="px-6 py-3.5">Hasil / Arsip</th>
+                <th class="px-6 py-3.5 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-if="registrations.length === 0">
-                <td colspan="5" class="px-6 py-8 text-center text-slate-400">
+                <td colspan="6" class="px-6 py-8 text-center text-slate-400">
                   Belum ada pengajuan pendaftaran lomba.
                 </td>
               </tr>
@@ -182,24 +256,63 @@ onMounted(() => {
                 <td class="px-6 py-4">
                   <Badge :status="reg.status" />
                 </td>
-                <td class="px-6 py-4 text-right space-x-2">
+                <!-- Hasil / Arsip Lomba -->
+                <td class="px-6 py-4">
+                  <div v-if="reg.result_status === 'winner'" class="flex items-center gap-1.5 text-amber-700 font-bold">
+                    <i class="fa-solid fa-trophy text-amber-500"></i>
+                    <span>{{ reg.rank_details || 'Juara' }}</span>
+                  </div>
+                  <div v-else-if="reg.result_status === 'participant'" class="flex items-center gap-1.5 text-emerald-700 font-bold">
+                    <i class="fa-solid fa-id-badge text-emerald-500"></i>
+                    <span>{{ reg.rank_details || 'Peserta Terdaftar' }}</span>
+                  </div>
+                  <div v-else-if="reg.result_status === 'finalist'" class="flex items-center gap-1.5 text-purple-700 font-bold">
+                    <i class="fa-solid fa-star text-purple-500"></i>
+                    <span>Finalis</span>
+                  </div>
+                  <span v-else class="text-slate-400 text-[11px] italic">
+                    Belum ada hasil
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-right space-x-1.5 whitespace-nowrap">
                   <template v-if="reg.status === 'submitted' || reg.status === 'in_review'">
                     <button
                       type="button"
                       @click="openReviewModal(reg, 'approve')"
-                      class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs"
+                      class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs"
                     >
                       <i class="fa-solid fa-check mr-1"></i> Rekomendasikan
                     </button>
                     <button
                       type="button"
                       @click="openReviewModal(reg, 'reject')"
-                      class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold"
+                      class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold"
                     >
                       <i class="fa-solid fa-xmark mr-1"></i> Tolak
                     </button>
                   </template>
-                  <span v-else class="text-[11px] text-slate-400 italic">Selesai diproses</span>
+
+                  <!-- Tombol Catat Hasil Lomba -->
+                  <button
+                    type="button"
+                    @click="openResultModal(reg)"
+                    class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-brand-navy border border-blue-200 rounded-lg text-xs font-bold transition-all"
+                    title="Catat Hasil (Menang / Kalah / Peserta)"
+                  >
+                    <i class="fa-solid fa-medal mr-1 text-brand-gold"></i>
+                    <span>Catat Hasil</span>
+                  </button>
+
+                  <!-- Tombol Unduh Sertifikat jika ada -->
+                  <button
+                    v-if="reg.certificate_file"
+                    type="button"
+                    @click="downloadCertificate(reg.id)"
+                    class="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold"
+                    title="Unduh Sertifikat"
+                  >
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -318,6 +431,80 @@ onMounted(() => {
           </div>
         </form>
       </Modal>
+
+      <!-- Record Competition Result Modal (Menang / Kalah / Peserta) -->
+      <Modal v-model="showResultModal" title="Catat Hasil & Arsip Partisipasi Lomba" size="md">
+        <form @submit.prevent="submitResult" class="space-y-4 text-xs">
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <p><span class="font-semibold text-slate-500">Siswa:</span> <span class="font-bold text-slate-800">{{ selectedReg?.student?.full_name }}</span> (NIS: {{ selectedReg?.student?.nis }})</p>
+            <p><span class="font-semibold text-slate-500">Kompetisi:</span> <span class="font-bold text-slate-800">{{ selectedReg?.competition?.name }}</span></p>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Status Hasil Lomba *</label>
+            <select
+              v-model="resultForm.result_status"
+              required
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+            >
+              <option value="participant">Peserta / Partisipan (Dokumentasi Pengalaman Berlomba)</option>
+              <option value="winner">Juara / Pemenang (Juara 1, 2, 3, Harapan, Emas/Perak/Perunggu)</option>
+              <option value="finalist">Finalis / Semifinalis</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Predikat / Keterangan Peringkat *</label>
+            <input
+              v-model="resultForm.rank_details"
+              type="text"
+              required
+              placeholder="Contoh: Peserta Babak Penyisihan, Juara 1 Nasional, Finalis 10 Besar"
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+            />
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Berkas Sertifikat (PDF / JPG / PNG, maks 5MB)</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              @change="handleCertificateFileChange"
+              class="w-full text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand-navy file:text-white hover:file:bg-blue-900 cursor-pointer"
+            />
+            <p class="text-[10px] text-slate-400 mt-1">Dapat berupa sertifikat kepesertaan (certificate of participation) atau piagam kejuaraan.</p>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Catatan Tambahan (Opsional)</label>
+            <textarea
+              v-model="resultForm.result_notes"
+              rows="2"
+              placeholder="Catatan skor, evaluasi pembina, atau jalannya lomba..."
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+            ></textarea>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              @click="showResultModal = false"
+              class="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              :disabled="recordingResult"
+              class="px-5 py-2 font-bold text-white bg-brand-navy hover:bg-[#001442] rounded-xl shadow-xs flex items-center gap-2"
+            >
+              <i v-if="recordingResult" class="fa-solid fa-spinner fa-spin"></i>
+              <span>Simpan & Arsipkan</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   </DashboardLayout>
 </template>
+

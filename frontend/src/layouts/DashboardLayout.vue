@@ -30,17 +30,20 @@ const menuItems = computed(() => {
     return [
       { label: 'Dashboard Sekolah', path: '/school/dashboard', icon: 'fa-solid fa-gauge-high' },
       { label: 'Manajemen Siswa', path: '/school/students', icon: 'fa-solid fa-user-graduate' },
-      { label: 'Delegasi & Pendaftaran', path: '/school/registrations', icon: 'fa-solid fa-clipboard-check' },
-      { label: 'Rekam Prestasi Siswa', path: '/school/achievements', icon: 'fa-solid fa-medal' },
+      { label: 'Arsip Partisipasi Siswa', path: '/school/registrations', icon: 'fa-solid fa-clipboard-check' },
+      { label: 'Perizinan Dispensasi KBM', path: '/school/dispensations', icon: 'fa-solid fa-file-signature' },
+      { label: 'Rekam Prestasi Juara', path: '/school/achievements', icon: 'fa-solid fa-medal' },
     ]
   }
 
   if (authStore.isStudent) {
     return [
       { label: 'Beranda Siswa', path: '/student/dashboard', icon: 'fa-solid fa-gauge-high' },
-      { label: 'Jelajah Lomba & Eligibility', path: '/student/competitions', icon: 'fa-solid fa-compass' },
+      { label: 'Arsip Riwayat Lomba', path: '/student/portfolio', icon: 'fa-solid fa-folder-open' },
+      { label: 'Izin Dispensasi KBM', path: '/student/dispensations', icon: 'fa-solid fa-file-signature' },
+      { label: 'Katalog Lomba Resmi', path: '/student/competitions', icon: 'fa-solid fa-compass' },
       { label: 'Pendaftaran Saya', path: '/student/registrations', icon: 'fa-solid fa-receipt' },
-      { label: 'Portofolio Prestasi & QR', path: '/student/achievements', icon: 'fa-solid fa-award' },
+      { label: 'Piagam Juara & QR', path: '/student/achievements', icon: 'fa-solid fa-award' },
     ]
   }
 

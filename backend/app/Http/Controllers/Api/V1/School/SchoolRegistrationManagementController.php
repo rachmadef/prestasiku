@@ -304,4 +304,93 @@ class SchoolRegistrationManagementController extends Controller
             'data' => $registration->load(['competition:id,title', 'student:id,full_name', 'team.students']),
         ], 201);
     }
+
+    /**
+     * Record competition result (participant/kalah, finalist, winner) and upload certificate.
+     */
+    public function recordResult(Request $request, int $id): JsonResponse
+    {
+        $school = $request->user()->school;
+        $registration = Registration::where('school_id', $school->id)
+            ->with(['student.user', 'competition'])
+            ->findOrFail($id);
+
+        $validated = $request->validate([
+            'result_status' => 'required|in:participant,finalist,winner',
+            'rank_details' => 'required|string|max:100', // e.g. "Peserta", "Juara 1", "Finalis"
+            'result_notes' => 'nullable|string',
+            'certificate_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+        ]);
+
+        $certificatePath = $registration->certificate_file;
+        if ($request->hasFile('certificate_file')) {
+            $certificatePath = $request->file('certificate_file')->store('participation_certificates', 'local');
+        }
+
+        $registration->update([
+            'result_status' => $validated['result_status'],
+            'rank_details' => $validated['rank_details'],
+            'result_notes' => $validated['result_notes'] ?? null,
+            'certificate_file' => $certificatePath,
+            'result_recorded_at' => now(),
+            'status' => 'confirmed',
+        ]);
+
+        // If winner, also record in achievements table for official verified achievement record
+        if ($validated['result_status'] === 'winner' && $registration->student_id) {
+            $achievement = \App\Models\Achievement::firstOrNew([
+                'registration_id' => $registration->id,
+            ]);
+
+            $achievement->fill([
+                'student_id' => $registration->student_id,
+                'school_id' => $registration->school_id,
+                'competition_id' => $registration->competition_id,
+                'title' => "{$validated['rank_details']} - {$registration->competition->title}",
+                'level' => $registration->competition->level ?? 'nasional',
+                'rank' => $validated['rank_details'],
+                'event_name' => $registration->competition->title,
+                'organizer_name' => $registration->competition->organizer?->name ?? 'Penyelenggara Lomba',
+                'event_date' => $registration->competition->event_start_at ?? now(),
+                'status' => 'verified',
+                'verified_by' => $request->user()->id,
+                'verified_at' => now(),
+                'is_public' => true,
+            ]);
+            $achievement->save();
+
+            if ($certificatePath) {
+                $achievement->documents()->create([
+                    'document_type' => 'certificate',
+                    'file_path' => $certificatePath,
+                    'file_name' => "Sertifikat-{$validated['rank_details']}.pdf",
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Hasil lomba dan arsip sertifikat keikutsertaan siswa berhasil didokumentasikan.',
+            'data' => $registration->fresh(['student', 'team', 'competition:id,title']),
+        ]);
+    }
+
+    /**
+     * Download participation or winner certificate.
+     */
+    public function downloadCertificate(Request $request, int $id)
+    {
+        $school = $request->user()->school;
+        $registration = Registration::where('school_id', $school->id)->findOrFail($id);
+
+        if (! $registration->certificate_file || ! \Illuminate\Support\Facades\Storage::disk('local')->exists($registration->certificate_file)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Berkas sertifikat tidak ditemukan di server.',
+            ], 404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download($registration->certificate_file);
+    }
 }
+

@@ -8,13 +8,16 @@ use App\Http\Controllers\Api\V1\Admin\SchoolRegistrationReviewController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompetitionEligibilityController;
 use App\Http\Controllers\Api\V1\Public\CompetitionCatalogController;
+use App\Http\Controllers\Api\V1\Public\PublicDispensationVerificationController;
 use App\Http\Controllers\Api\V1\Public\PublicVerificationController;
 use App\Http\Controllers\Api\V1\School\SchoolAchievementController;
+use App\Http\Controllers\Api\V1\School\SchoolDispensationController;
 use App\Http\Controllers\Api\V1\School\SchoolRegistrationManagementController;
 use App\Http\Controllers\Api\V1\School\StudentImportController;
 use App\Http\Controllers\Api\V1\School\StudentManagementController;
 use App\Http\Controllers\Api\V1\SchoolRegistrationController;
 use App\Http\Controllers\Api\V1\Student\StudentAchievementController;
+use App\Http\Controllers\Api\V1\Student\StudentDispensationController;
 use App\Http\Controllers\Api\V1\Student\StudentRegistrationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +37,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // Public QR Verification (Privacy-by-default)
     Route::get('/verify/{public_id}', [PublicVerificationController::class, 'verify'])->name('verify.show');
     Route::get('/verify/{public_id}/qr', [PublicVerificationController::class, 'qr'])->name('verify.qr');
+
+    // Public QR Verification for KBM Dispensation
+    Route::get('/dispensations/verify/{token}', [PublicDispensationVerificationController::class, 'verify'])->name('dispensations.verify');
 
     // -------------------------------------------------------------
     // Protected Endpoints (Sanctum + Active User + Password Changed Check)
@@ -67,6 +73,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/registrations', [StudentRegistrationController::class, 'index'])->name('registrations.index');
             Route::post('/registrations', [StudentRegistrationController::class, 'store'])->name('registrations.store');
             Route::get('/registrations/{id}', [StudentRegistrationController::class, 'show'])->name('registrations.show');
+            Route::post('/registrations/{id}/upload-certificate', [StudentRegistrationController::class, 'uploadCertificate'])->name('registrations.upload-certificate');
+            Route::get('/registrations/{id}/certificate', [StudentRegistrationController::class, 'downloadCertificate'])->name('registrations.download-certificate');
+
+            // Portfolio: Complete competition history (Menang & Kalah/Partisipan)
+            Route::get('/portfolio', [StudentRegistrationController::class, 'portfolio'])->name('portfolio');
+
+            // Student KBM Dispensations
+            Route::get('/dispensations', [StudentDispensationController::class, 'index'])->name('dispensations.index');
+            Route::post('/dispensations', [StudentDispensationController::class, 'store'])->name('dispensations.store');
+            Route::get('/dispensations/{id}', [StudentDispensationController::class, 'show'])->name('dispensations.show');
 
             // Student Achievements
             Route::get('/achievements', [StudentAchievementController::class, 'index'])->name('achievements.index');
@@ -129,11 +145,20 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/students-import', [StudentImportController::class, 'import'])->name('students.import');
             Route::get('/students-import/history', [StudentImportController::class, 'history'])->name('students.import.history');
 
-            // Delegation & Registration Review
+            // Delegation & Registration Review + Participation Result Recording
             Route::get('/registrations', [SchoolRegistrationManagementController::class, 'index'])->name('registrations.index');
             Route::get('/registrations/{id}', [SchoolRegistrationManagementController::class, 'show'])->name('registrations.show');
             Route::post('/registrations/{id}/review', [SchoolRegistrationManagementController::class, 'review'])->name('registrations.review');
             Route::post('/registrations/direct', [SchoolRegistrationManagementController::class, 'directRegister'])->name('registrations.direct');
+            Route::post('/registrations/{id}/result', [SchoolRegistrationManagementController::class, 'recordResult'])->name('registrations.result');
+            Route::get('/registrations/{id}/certificate', [SchoolRegistrationManagementController::class, 'downloadCertificate'])->name('registrations.certificate');
+
+            // KBM Dispensations Management
+            Route::get('/dispensations', [SchoolDispensationController::class, 'index'])->name('dispensations.index');
+            Route::post('/dispensations', [SchoolDispensationController::class, 'store'])->name('dispensations.store');
+            Route::get('/dispensations/{id}', [SchoolDispensationController::class, 'show'])->name('dispensations.show');
+            Route::post('/dispensations/{id}/review', [SchoolDispensationController::class, 'review'])->name('dispensations.review');
+            Route::get('/dispensations/{id}/print-letter', [SchoolDispensationController::class, 'printLetter'])->name('dispensations.print-letter');
 
             // Achievements Management & Verification
             Route::get('/achievements', [SchoolAchievementController::class, 'index'])->name('achievements.index');

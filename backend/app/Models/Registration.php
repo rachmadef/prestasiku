@@ -27,6 +27,11 @@ use Illuminate\Support\Str;
     'school_notes',
     'assignment_letter_number',
     'assignment_letter_file',
+    'result_status',
+    'rank_details',
+    'certificate_file',
+    'result_notes',
+    'result_recorded_at',
 ])]
 class Registration extends Model
 {
@@ -36,6 +41,7 @@ class Registration extends Model
     {
         return [
             'school_approved_at' => 'datetime',
+            'result_recorded_at' => 'datetime',
         ];
     }
 
