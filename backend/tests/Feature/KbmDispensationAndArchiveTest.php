@@ -265,4 +265,182 @@ class KbmDispensationAndArchiveTest extends TestCase
                 ],
             ]);
     }
+
+    public function test_school_admin_can_manage_dispensation_form_schema_and_create_with_custom_fields(): void
+    {
+        $schema = [
+            [
+                'id' => 'field_1',
+                'name' => 'lokasi_karantina',
+                'label' => 'Lokasi Karantina / Pelatihan',
+                'type' => 'text',
+                'placeholder' => 'Contoh: Lab Komputer 1',
+                'description' => 'Ruang tempat siswa berlatih',
+                'options' => [],
+                'is_required' => true,
+            ],
+            [
+                'id' => 'field_2',
+                'name' => 'sumber_dana',
+                'label' => 'Sumber Pembiayaan',
+                'type' => 'select',
+                'placeholder' => null,
+                'description' => 'Alokasi anggaran',
+                'options' => ['Dana BOS', 'Komite', 'Mandiri'],
+                'is_required' => false,
+            ],
+        ];
+
+        // 1. School Admin updates form schema
+        $updateRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->putJson('/api/v1/school/dispensations/form-schema', [
+                'schema' => $schema,
+            ]);
+
+        $updateRes->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'school_id' => $this->school->id,
+                ],
+            ]);
+
+        // 2. School Admin retrieves form schema
+        $getRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->getJson('/api/v1/school/dispensations/form-schema');
+
+        $getRes->assertStatus(200)
+            ->assertJsonCount(2, 'data.schema')
+            ->assertJsonPath('data.schema.0.name', 'lokasi_karantina');
+
+        // 3. Student can also retrieve school's form schema
+        $studentGetRes = $this->actingAs($this->studentUser, 'sanctum')
+            ->getJson('/api/v1/student/dispensations/form-schema');
+
+        $studentGetRes->assertStatus(200)
+            ->assertJsonPath('data.schema.0.name', 'lokasi_karantina');
+
+        // 4. School Admin creates dispensation with custom_fields_data
+        $createRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->postJson('/api/v1/school/dispensations', [
+                'competition_name' => 'Olimpiade Sains Terapan 2026',
+                'dispensation_type' => 'persiapan_latihan',
+                'purpose' => 'Persiapan intensif materi olimpiade',
+                'start_date' => now()->addDays(1)->format('Y-m-d'),
+                'end_date' => now()->addDays(3)->format('Y-m-d'),
+                'is_all_day' => true,
+                'supervisor_name' => 'Dra. Hj. Siti Aminah, M.Pd.',
+                'student_ids' => [$this->student->id],
+                'custom_fields_data' => [
+                    'lokasi_karantina' => 'Laboratorium Multimedia Lantai 2',
+                    'sumber_dana' => 'Dana BOS',
+                ],
+            ]);
+
+        $createRes->assertStatus(201)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'custom_fields_data' => [
+                        'lokasi_karantina' => 'Laboratorium Multimedia Lantai 2',
+                        'sumber_dana' => 'Dana BOS',
+                    ],
+                ],
+            ]);
+
+        $dispId = $createRes->json('data.id');
+
+        // 5. Printable letter includes form schema and custom fields
+        $printRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->getJson("/api/v1/school/dispensations/{$dispId}/print-letter");
+
+        $printRes->assertStatus(200)
+            ->assertJsonPath('data.custom_fields_data.lokasi_karantina', 'Laboratorium Multimedia Lantai 2')
+            ->assertJsonPath('data.form_schema.0.name', 'lokasi_karantina');
+    }
+
+    public function test_school_can_manage_letterhead_and_export_docx_and_pdf_with_dual_signatures(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        // 1. Get initial letter template config
+        $getRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->getJson('/api/v1/school/dispensations/letter-template');
+
+        $getRes->assertStatus(200)
+            ->assertJsonPath('data.letterhead_type', 'text');
+
+        // 2. Upload letterhead image & configure custom letter details
+        $fakeImage = \Illuminate\Http\UploadedFile::fake()->image('kop_surat_sman1.png', 800, 200);
+
+        $updateRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->postJson('/api/v1/school/dispensations/letter-template', [
+                'letterhead_type' => 'image',
+                'letterhead_image' => $fakeImage,
+                'institution_level1' => 'PEMERINTAH PROVINSI JAWA BARAT',
+                'institution_level2' => 'DINAS PENDIDIKAN WILAYAH III',
+                'document_title' => 'SURAT KETERANGAN DISPENSASI BELAJAR (KBM)',
+            ]);
+
+        $updateRes->assertStatus(200)
+            ->assertJsonPath('data.letterhead_type', 'image')
+            ->assertJsonPath('data.letter_format_config.institution_level1', 'PEMERINTAH PROVINSI JAWA BARAT');
+
+        $this->school->refresh();
+        $this->assertNotNull($this->school->letterhead_image_path);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($this->school->letterhead_image_path);
+
+        // 3. Create approved dispensation with supervisor name
+        $disp = KbmDispensation::create([
+            'school_id' => $this->school->id,
+            'competition_name' => 'Lomba Karya Ilmiah Pelajar 2026',
+            'dispensation_type' => 'persiapan_latihan',
+            'purpose' => 'Uji coba instrumen penelitian',
+            'start_date' => now()->format('Y-m-d'),
+            'end_date' => now()->addDays(2)->format('Y-m-d'),
+            'is_all_day' => true,
+            'supervisor_name' => 'Dr. H. Mulyadi, S.Si., M.Pd.',
+            'status' => 'approved',
+            'reference_number' => '421.3/001/DISP/2026',
+            'requested_by' => $this->schoolAdminUser->id,
+            'approved_by' => $this->schoolAdminUser->id,
+            'approved_at' => now(),
+        ]);
+        $disp->students()->attach($this->student->id);
+
+        // 4. Verify printLetter contains the 2 signatures structure:
+        // Signature 1: Guru Pembina Lomba (filled with supervisor_name)
+        // Signature 2: Guru Mapel / Guru Piket (blank for wet signature in class)
+        $printRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->getJson("/api/v1/school/dispensations/{$disp->id}/print-letter");
+
+        $printRes->assertStatus(200)
+            ->assertJsonPath('data.signatures.pembina.name', 'Dr. H. Mulyadi, S.Si., M.Pd.')
+            ->assertJsonPath('data.signatures.mapel.name', '( .................................................. )')
+            ->assertJsonPath('data.letterhead_type', 'image');
+
+        // 5. Test School Admin downloading DOCX
+        $docxRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->get("/api/v1/school/dispensations/{$disp->id}/download-docx");
+
+        $docxRes->assertStatus(200);
+        $this->assertStringContainsString('wordprocessingml.document', $docxRes->headers->get('content-type'));
+
+        // 6. Test School Admin downloading PDF
+        $pdfRes = $this->actingAs($this->schoolAdminUser, 'sanctum')
+            ->get("/api/v1/school/dispensations/{$disp->id}/download-pdf");
+
+        $pdfRes->assertStatus(200);
+        $this->assertStringContainsString('application/pdf', $pdfRes->headers->get('content-type'));
+
+        // 7. Test Student downloading approved DOCX & PDF
+        $stdDocxRes = $this->actingAs($this->studentUser, 'sanctum')
+            ->get("/api/v1/student/dispensations/{$disp->id}/download-docx");
+        $stdDocxRes->assertStatus(200);
+
+        $stdPdfRes = $this->actingAs($this->studentUser, 'sanctum')
+            ->get("/api/v1/student/dispensations/{$disp->id}/download-pdf");
+        $stdPdfRes->assertStatus(200);
+    }
 }
+

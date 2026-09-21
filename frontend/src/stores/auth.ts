@@ -112,6 +112,27 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    async updateProfile(data: { name: string; email: string; phone: string | null }) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.put('/auth/profile', data)
+        if (this.user) {
+          this.user.name = data.name
+          this.user.email = data.email
+          this.user.phone = data.phone
+          localStorage.setItem('user', JSON.stringify(this.user))
+        }
+        return { success: true, message: response.data.message || 'Profil berhasil diperbarui.' }
+      } catch (err: any) {
+        const msg = err.response?.data?.message || 'Gagal memperbarui profil.'
+        const errors = err.response?.data?.errors
+        return { success: false, message: msg, errors }
+      } finally {
+        this.loading = false
+      }
+    },
+
     logout() {
       if (this.token) {
         api.post('/auth/logout').catch(() => {})

@@ -76,6 +76,8 @@ class SchoolRegistrationApprovalTest extends TestCase
             'status' => 'pending',
         ]);
 
+        \Illuminate\Support\Facades\Mail::fake();
+
         $response = $this->actingAs($this->superAdmin)
             ->postJson("/api/v1/admin/school-registrations/{$reg->id}/review", [
                 'action' => 'approve',
@@ -85,7 +87,12 @@ class SchoolRegistrationApprovalTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.registration.status', 'approved')
-            ->assertJsonPath('data.school.npsn', '55667788');
+            ->assertJsonPath('data.school.npsn', '55667788')
+            ->assertJsonPath('data.admin_account.temporary_password', 'password123');
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\SchoolAdminAccountCreatedMail::class, function ($mail) {
+            return $mail->temporaryPassword === 'password123' && $mail->hasTo('endang@smabintang.sch.id');
+        });
 
         // Check school exists
         $this->assertDatabaseHas('schools', [

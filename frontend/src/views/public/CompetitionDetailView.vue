@@ -89,6 +89,60 @@ function formatDate(dateStr: string) {
   })
 }
 
+const registrationLink = computed(() => {
+  return competition.value?.registration_url || competition.value?.official_website_url || competition.value?.official_url || null
+})
+
+function getSourceBadge(type: string) {
+  switch (type) {
+    case 'puspresnas':
+      return { label: 'Portal Puspresnas', icon: 'fa-solid fa-landmark', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' }
+    case 'official_website':
+      return { label: 'Website Resmi Penyelenggara', icon: 'fa-solid fa-globe', color: 'bg-blue-50 text-blue-700 border-blue-200' }
+    case 'circular_letter':
+      return { label: 'Buku Pedoman & Juknis', icon: 'fa-solid fa-file-lines', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    case 'news_portal':
+      return { label: 'Siaran Pers / Berita', icon: 'fa-solid fa-newspaper', color: 'bg-amber-50 text-amber-700 border-amber-200' }
+    case 'instagram':
+      return { label: 'Media Sosial Resmi', icon: 'fa-brands fa-instagram', color: 'bg-pink-50 text-pink-700 border-pink-200' }
+    default:
+      return { label: 'Tautan Referensi', icon: 'fa-solid fa-link', color: 'bg-slate-50 text-slate-700 border-slate-200' }
+  }
+}
+
+function getCurationBadge(type: string) {
+  switch (type) {
+    case 'resmi_negara':
+      return {
+        label: 'Resmi Negara',
+        icon: 'fa-solid fa-shield-halved',
+        color: 'bg-blue-50 text-blue-700 border-blue-200',
+        desc: 'Ajang resmi berjenjang yang digelar pemerintah dan terkurasi Puspresnas Kemendikdasmen RI.',
+      }
+    case 'terkurasi_puspresnas':
+      return {
+        label: 'Terkurasi Puspresnas',
+        icon: 'fa-solid fa-circle-check',
+        color: 'bg-amber-50 text-amber-800 border-amber-200',
+        desc: 'Telah lolos verifikasi Kurasi Prestasi Puspresnas melalui Sistem Informasi Manajemen Talenta (SIMT).',
+      }
+    case 'bergengsi_non_kurasi':
+      return {
+        label: 'Bergengsi Non-Terkurasi',
+        icon: 'fa-solid fa-star',
+        color: 'bg-purple-50 text-purple-700 border-purple-200',
+        desc: 'Ajang bergengsi independen tingkat nasional. Sangat berguna untuk pengalaman kompetitif dan portofolio prestasi.',
+      }
+    default:
+      return {
+        label: 'Resmi Negara',
+        icon: 'fa-solid fa-shield-halved',
+        color: 'bg-blue-50 text-blue-700 border-blue-200',
+        desc: 'Ajang resmi berjenjang yang digelar pemerintah dan terkurasi Puspresnas.',
+      }
+  }
+}
+
 onMounted(() => {
   fetchCompetitionDetail()
 })
@@ -133,15 +187,49 @@ onMounted(() => {
                 <i class="fa-solid fa-tag text-[10px]"></i>
                 {{ competition.category?.name || 'Kompetisi' }}
               </span>
+
+              <!-- Curation Tier Badge -->
+              <span
+                class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border shadow-2xs"
+                :class="getCurationBadge(competition.curation_type || 'resmi_negara').color"
+              >
+                <i :class="getCurationBadge(competition.curation_type || 'resmi_negara').icon" class="text-[10px]"></i>
+                <span>{{ getCurationBadge(competition.curation_type || 'resmi_negara').label }}</span>
+                <span v-if="competition.curation_rating" class="ml-1 px-1.5 py-0.2 bg-white/80 rounded-md text-[10px] font-bold">
+                  {{ competition.curation_rating }}
+                </span>
+              </span>
+
               <Badge :status="competition.verification_status || 'verified'" size="md" />
               <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full uppercase">
-                {{ competition.scope || 'Nasional' }}
+                {{ competition.level || competition.scope || 'Nasional' }}
               </span>
             </div>
 
             <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-snug">
-              {{ competition.name }}
+              {{ competition.title || competition.name }}
             </h1>
+
+            <!-- Curation Callout Banner -->
+            <div
+              class="p-4 rounded-2xl border flex items-start gap-3 text-xs leading-relaxed"
+              :class="getCurationBadge(competition.curation_type || 'resmi_negara').color"
+            >
+              <div class="text-base mt-0.5 shrink-0">
+                <i :class="getCurationBadge(competition.curation_type || 'resmi_negara').icon"></i>
+              </div>
+              <div class="space-y-0.5">
+                <p class="font-bold">
+                  Tingkat Kepercayaan: {{ getCurationBadge(competition.curation_type || 'resmi_negara').label }}
+                  <span v-if="competition.curation_number" class="ml-1 text-[11px] font-normal opacity-90">
+                    ({{ competition.curation_number }})
+                  </span>
+                </p>
+                <p class="opacity-90">
+                  {{ getCurationBadge(competition.curation_type || 'resmi_negara').desc }}
+                </p>
+              </div>
+            </div>
 
             <div class="flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-slate-500 pt-2 border-t border-slate-100">
               <div class="flex items-center gap-2">
@@ -156,34 +244,156 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Description -->
-            <div>
-              <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-2">Deskripsi Kompetisi</h2>
-              <div class="text-sm text-slate-700 leading-relaxed space-y-3 whitespace-pre-line">
+            <!-- Description & Summary -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">
+                  Rangkuman & Deskripsi Kompetisi
+                </h2>
+                <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-blue bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+                  <i class="fa-solid fa-layer-group text-[10px]"></i>
+                  <span>Disintesis dari Sumber Resmi</span>
+                </span>
+              </div>
+              <div class="text-sm text-slate-700 leading-relaxed space-y-3 whitespace-pre-line bg-slate-50/60 p-5 rounded-2xl border border-slate-200/60">
                 {{ competition.description }}
               </div>
             </div>
 
-            <!-- Verification Audit Box -->
-            <div class="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/70 flex items-start gap-3 text-xs text-emerald-900">
-              <i class="fa-solid fa-circle-check text-emerald-600 text-lg mt-0.5 shrink-0"></i>
-              <div>
-                <p class="font-bold">Keaslian Sumber Terverifikasi</p>
-                <p class="text-emerald-800 mt-0.5">
-                  Kompetisi ini telah diverifikasi keabsahannya oleh tim PrestasiKu melalui panduan resmi penyelenggara. Dokumen dan tautan resmi aman diakses.
-                </p>
-                <div v-if="competition.official_url" class="mt-2">
-                  <a
-                    :href="competition.official_url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center gap-1.5 font-bold text-brand-navy hover:underline"
-                  >
-                    <span>Kunjungi Tautan Resmi Lomba</span>
-                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                  </a>
+            <!-- Quick Document & Portal Links Bar -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <a
+                v-if="registrationLink"
+                :href="registrationLink"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50/80 hover:bg-blue-100/90 border border-blue-200/80 text-brand-blue transition-all group shadow-2xs"
+              >
+                <div class="w-9 h-9 rounded-xl bg-brand-blue text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <i class="fa-solid fa-paper-plane text-xs"></i>
                 </div>
+                <div class="min-w-0">
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-brand-blue/70">Pendaftaran</p>
+                  <p class="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
+                    <span>Link Pendaftaran</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400"></i>
+                  </p>
+                </div>
+              </a>
+
+              <a
+                v-if="competition.guide_book_url"
+                :href="competition.guide_book_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 text-emerald-800 transition-all group shadow-2xs"
+              >
+                <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <i class="fa-solid fa-file-pdf text-xs"></i>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80">Panduan Teknis</p>
+                  <p class="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
+                    <span>Buku Juknis PDF</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400"></i>
+                  </p>
+                </div>
+              </a>
+
+              <a
+                v-if="competition.official_website_url || competition.official_url"
+                :href="competition.official_website_url || competition.official_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-3 p-3.5 rounded-2xl bg-purple-50/80 hover:bg-purple-100/90 border border-purple-200/80 text-purple-800 transition-all group shadow-2xs"
+              >
+                <div class="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <i class="fa-solid fa-globe text-xs"></i>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-purple-700/80">Penyelenggara</p>
+                  <p class="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
+                    <span>Website Resmi</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400"></i>
+                  </p>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <!-- Multi-Source Verification & Reference Section -->
+          <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+              <div>
+                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+                  Kurasi & Rangkuman Multi-Sumber Terverifikasi
+                </h2>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  Informasi kompetisi ini dirangkum dari beberapa portal website resmi penyelenggara yang telah diaudit keabsahannya oleh tim PrestasiKu.
+                </p>
               </div>
+              <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/60 shrink-0">
+                <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                Sumber Asli Sah
+              </span>
+            </div>
+
+            <!-- List of sources -->
+            <div v-if="competition.sources && competition.sources.length > 0" class="space-y-3">
+              <div
+                v-for="(src, idx) in competition.sources"
+                :key="src.id || idx"
+                class="p-4 rounded-2xl border border-slate-200/80 hover:border-brand-blue/50 bg-slate-50/40 hover:bg-white transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-2xs"
+              >
+                <div class="space-y-1.5 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span
+                      class="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-lg border"
+                      :class="getSourceBadge(src.source_type).color"
+                    >
+                      <i :class="getSourceBadge(src.source_type).icon"></i>
+                      {{ getSourceBadge(src.source_type).label }}
+                    </span>
+                    <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-emerald-100">
+                      <i class="fa-solid fa-check text-[9px]"></i> Valid
+                    </span>
+                  </div>
+
+                  <h3 class="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-brand-blue transition-colors">
+                    {{ src.source_title || 'Tautan Referensi Resmi Lomba' }}
+                  </h3>
+
+                  <p v-if="src.notes" class="text-xs text-slate-600 leading-relaxed">
+                    {{ src.notes }}
+                  </p>
+                </div>
+
+                <a
+                  :href="src.source_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-brand-navy bg-white hover:bg-brand-navy hover:text-white border border-slate-200 hover:border-brand-navy transition-all shrink-0 shadow-2xs"
+                >
+                  <span>Buka Sumber</span>
+                  <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                </a>
+              </div>
+            </div>
+
+            <!-- Fallback if no sources in array -->
+            <div v-else class="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-600 flex items-center justify-between">
+              <span>Informasi disintesis dari portal resmi penyelenggara. Dokumen dan tautan resmi aman diakses.</span>
+              <a
+                v-if="competition.official_website_url || competition.official_url"
+                :href="competition.official_website_url || competition.official_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-bold text-brand-navy hover:underline inline-flex items-center gap-1"
+              >
+                <span>Kunjungi Website Resmi</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
             </div>
           </div>
 
@@ -196,7 +406,7 @@ onMounted(() => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <p class="text-slate-400 font-medium mb-1">Tingkat Pendidikan</p>
-                <p class="font-bold text-slate-800 uppercase">{{ competition.educational_level || 'SLTA' }}</p>
+                <p class="font-bold text-slate-800 uppercase">{{ competition.target_level || competition.educational_level || 'SLTA' }}</p>
               </div>
               <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <p class="text-slate-400 font-medium mb-1">Rekomendasi Sekolah</p>
@@ -263,17 +473,44 @@ onMounted(() => {
 
             <!-- Action Buttons -->
             <div class="pt-4 border-t border-slate-100 space-y-3">
+              <!-- Direct Official Registration Link (Link Pendaftaran Lomba) -->
+              <div v-if="registrationLink">
+                <a
+                  :href="registrationLink"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="w-full py-3.5 px-4 bg-gradient-to-r from-brand-blue to-[#0050a0] hover:from-[#0050a0] hover:to-brand-blue text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 group"
+                >
+                  <i class="fa-solid fa-arrow-up-right-from-square text-brand-gold group-hover:scale-110 transition-transform"></i>
+                  <span>Link Pendaftaran Lomba</span>
+                </a>
+                <p class="text-[11px] text-center text-slate-500 mt-1.5 flex items-center justify-center gap-1">
+                  <i class="fa-solid fa-circle-check text-[10px] text-emerald-600"></i>
+                  <span>Tautan registrasi resmi penyelenggara</span>
+                </p>
+              </div>
+
+              <!-- Divider for PrestasiKu Internal Services -->
+              <div class="relative py-1.5 flex items-center justify-center">
+                <div class="absolute inset-0 flex items-center">
+                  <div class="w-full border-t border-slate-200"></div>
+                </div>
+                <span class="relative bg-white px-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Atau via PrestasiKu
+                </span>
+              </div>
+
               <!-- If Student -->
               <template v-if="authStore.isStudent">
                 <button
                   type="button"
                   @click="checkStudentEligibility"
                   :disabled="checkingEligibility"
-                  class="w-full py-3 px-4 bg-brand-navy hover:bg-[#001442] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                  class="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
                 >
                   <i v-if="checkingEligibility" class="fa-solid fa-spinner fa-spin"></i>
                   <i v-else class="fa-solid fa-circle-check text-brand-gold"></i>
-                  <span>Cek Kelayakan Saya & Daftar</span>
+                  <span>Daftar Internal (Rekomendasi Sekolah)</span>
                 </button>
 
                 <!-- Eligibility alert message -->
@@ -293,9 +530,9 @@ onMounted(() => {
               <template v-else-if="authStore.isSchoolAdmin">
                 <router-link
                   to="/school/registrations"
-                  class="w-full py-3 px-4 bg-brand-blue hover:bg-[#0d4f88] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                  class="w-full py-3 px-4 bg-brand-navy hover:bg-[#001442] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
                 >
-                  <i class="fa-solid fa-school-flag"></i>
+                  <i class="fa-solid fa-school-flag text-brand-gold"></i>
                   <span>Daftarkan Delegasi Siswa</span>
                 </router-link>
               </template>
@@ -304,13 +541,13 @@ onMounted(() => {
               <template v-else>
                 <router-link
                   to="/login"
-                  class="w-full py-3 px-4 bg-brand-navy hover:bg-[#001442] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                  class="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
                 >
                   <i class="fa-solid fa-arrow-right-to-bracket text-brand-gold"></i>
-                  <span>Masuk untuk Mendaftar</span>
+                  <span>Masuk untuk Rekomendasi Sekolah</span>
                 </router-link>
                 <p class="text-[11px] text-center text-slate-400">
-                  Pelajar atau perwakilan sekolah wajib memiliki akun untuk mendaftar.
+                  Untuk delegasi resmi & permohonan surat izin KBM.
                 </p>
               </template>
             </div>
@@ -322,7 +559,7 @@ onMounted(() => {
       <Modal
         v-model="showRegisterModal"
         title="Form Pendaftaran Kompetisi"
-        :subtitle="competition?.name"
+        :subtitle="competition?.title || competition?.name"
         size="lg"
       >
         <div v-if="submitSuccess" class="py-8 text-center space-y-3">

@@ -81,6 +81,11 @@ const routes: RouteRecordRaw[] = [
         name: 'admin.categories',
         component: () => import('@/views/admin/AdminCategoriesView.vue'),
       },
+      {
+        path: 'profile',
+        name: 'admin.profile',
+        component: () => import('@/views/profile/ProfileView.vue'),
+      },
     ],
   },
 
@@ -113,9 +118,19 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/school/SchoolDispensationsView.vue'),
       },
       {
+        path: 'dispensations/form-settings',
+        name: 'school.dispensations.form-settings',
+        component: () => import('@/views/school/SchoolDispensationFormBuilderView.vue'),
+      },
+      {
         path: 'achievements',
         name: 'school.achievements',
         component: () => import('@/views/school/SchoolAchievementsView.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'school.profile',
+        component: () => import('@/views/profile/ProfileView.vue'),
       },
     ],
   },
@@ -158,7 +173,20 @@ const routes: RouteRecordRaw[] = [
         name: 'student.achievements',
         component: () => import('@/views/student/StudentAchievementsView.vue'),
       },
+      {
+        path: 'profile',
+        name: 'student.profile',
+        component: () => import('@/views/profile/ProfileView.vue'),
+      },
     ],
+  },
+
+  // General Profile Route
+  {
+    path: '/profile',
+    name: 'profile',
+    component: () => import('@/views/profile/ProfileView.vue'),
+    meta: { requiresAuth: true },
   },
 
   // Fallback 404

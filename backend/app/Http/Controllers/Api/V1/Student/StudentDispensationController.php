@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Student;
 use App\Http\Controllers\Controller;
 use App\Models\KbmDispensation;
 use App\Models\Student;
+use App\Services\DispensationDocumentService;
 use App\Services\QrCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,8 +14,10 @@ use Illuminate\Validation\Rule;
 
 class StudentDispensationController extends Controller
 {
-    public function __construct(protected QrCodeService $qrCodeService)
-    {
+    public function __construct(
+        protected QrCodeService $qrCodeService,
+        protected DispensationDocumentService $documentService
+    ) {
     }
 
     /**
@@ -49,6 +52,32 @@ class StudentDispensationController extends Controller
     }
 
     /**
+     * Get the student's school dispensation custom form schema.
+     */
+    public function getFormSchema(Request $request): JsonResponse
+    {
+        $student = $request->user()->student;
+        if (! $student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data profil siswa tidak ditemukan.',
+            ], 404);
+        }
+
+        $school = $student->school;
+        $schema = $school ? ($school->dispensation_form_schema ?? []) : [];
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'school_id' => $school?->id,
+                'school_name' => $school?->name,
+                'schema' => $schema,
+            ],
+        ]);
+    }
+
+    /**
      * Submit a new KBM dispensation request by student.
      */
     public function store(Request $request): JsonResponse
@@ -78,11 +107,19 @@ class StudentDispensationController extends Controller
                 Rule::exists('students', 'id')->where(fn ($q) => $q->where('school_id', $student->school_id)),
             ],
             'notes' => 'nullable|string|max:255',
+            'custom_fields_data' => 'nullable',
         ]);
 
         $attachmentPath = null;
         if ($request->hasFile('attachment_file')) {
             $attachmentPath = $request->file('attachment_file')->store('dispensations', 'local');
+        }
+
+        // Process custom_fields_data (support JSON string in multipart/form-data or direct array)
+        $customFieldsData = null;
+        if ($request->has('custom_fields_data')) {
+            $rawCustom = $request->input('custom_fields_data');
+            $customFieldsData = is_string($rawCustom) ? json_decode($rawCustom, true) : $rawCustom;
         }
 
         DB::beginTransaction();
@@ -100,6 +137,7 @@ class StudentDispensationController extends Controller
                 'is_all_day' => $request->boolean('is_all_day', true),
                 'supervisor_name' => $validated['supervisor_name'] ?? null,
                 'attachment_path' => $attachmentPath,
+                'custom_fields_data' => $customFieldsData,
                 'status' => 'pending',
                 'requested_by' => $request->user()->id,
             ]);
@@ -162,5 +200,75 @@ class StudentDispensationController extends Controller
             'success' => true,
             'data' => $data,
         ]);
+    }
+
+    /**
+     * Download student approved dispensation as DOCX.
+     */
+    public function downloadDocx(Request $request, int $id)
+    {
+        $student = $request->user()->student;
+        $dispensation = KbmDispensation::where(function ($q) use ($student, $request) {
+            $q->whereHas('students', fn ($sq) => $sq->where('students.id', $student->id))
+                ->orWhere('requested_by', $request->user()->id);
+        })
+            ->with(['school', 'students', 'approvedBy'])
+            ->findOrFail($id);
+
+        if ($dispensation->status !== 'approved') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Surat perizinan belum disahkan oleh sekolah.',
+            ], 422);
+        }
+
+        try {
+            $filePath = $this->documentService->generateDocx($dispensation);
+            $safeRef = preg_replace('/[^a-zA-Z0-9_-]/', '_', $dispensation->reference_number ?: 'DISP');
+            $downloadName = "Surat_Dispensasi_{$safeRef}.docx";
+
+            return response()->download($filePath, $downloadName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ])->deleteFileAfterSend(true);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengunduh dokumen DOCX: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Download student approved dispensation as PDF.
+     */
+    public function downloadPdf(Request $request, int $id)
+    {
+        $student = $request->user()->student;
+        $dispensation = KbmDispensation::where(function ($q) use ($student, $request) {
+            $q->whereHas('students', fn ($sq) => $sq->where('students.id', $student->id))
+                ->orWhere('requested_by', $request->user()->id);
+        })
+            ->with(['school', 'students', 'approvedBy'])
+            ->findOrFail($id);
+
+        if ($dispensation->status !== 'approved') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Surat perizinan belum disahkan oleh sekolah.',
+            ], 422);
+        }
+
+        try {
+            $pdf = $this->documentService->generatePdf($dispensation);
+            $safeRef = preg_replace('/[^a-zA-Z0-9_-]/', '_', $dispensation->reference_number ?: 'DISP');
+            $downloadName = "Surat_Dispensasi_{$safeRef}.pdf";
+
+            return $pdf->download($downloadName);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengunduh dokumen PDF: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }

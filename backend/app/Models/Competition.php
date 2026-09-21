@@ -14,12 +14,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'organizer_id',
     'category_id',
+    'curation_type',
+    'curation_rating',
+    'curation_number',
     'title',
     'slug',
     'level',
     'target_level',
     'description',
     'official_website_url',
+    'registration_url',
     'guide_book_url',
     'poster_url',
     'participation_type',
@@ -156,5 +160,25 @@ class Competition extends Model
                         ->where('registration_deadline', '>=', $start);
                 });
         });
+    }
+
+    public function scopeCurationType(Builder $query, string $type): Builder
+    {
+        return $query->where('curation_type', $type);
+    }
+
+    public function scopeResmiNegara(Builder $query): Builder
+    {
+        return $query->where('curation_type', 'resmi_negara');
+    }
+
+    public function scopeTerkurasiPuspresnas(Builder $query): Builder
+    {
+        return $query->where('curation_type', 'terkurasi_puspresnas');
+    }
+
+    public function scopeBergengsiNonKurasi(Builder $query): Builder
+    {
+        return $query->where('curation_type', 'bergengsi_non_kurasi');
     }
 }

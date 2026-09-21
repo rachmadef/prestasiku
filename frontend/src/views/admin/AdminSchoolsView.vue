@@ -37,9 +37,16 @@ async function fetchData() {
   }
 }
 
+const adminPassword = ref('')
+const approvedAccount = ref<{ username: string; email: string; temporary_password: string } | null>(null)
+const copied = ref(false)
+
 function openReviewModal(reg: any, action: 'approve' | 'reject') {
   selectedRegistration.value = reg
   reviewAction.value = action
+  adminPassword.value = ''
+  approvedAccount.value = null
+  copied.value = false
   reviewNotes.value = action === 'approve'
     ? 'NPSN dan identitas instansi telah divalidasi sah.'
     : 'Dokumen dan validitas NPSN tidak dapat diverifikasi.'
@@ -53,20 +60,40 @@ async function submitReview() {
   reviewMessage.value = null
 
   try {
-    const response = await api.post(`/admin/school-registrations/${selectedRegistration.value.id}/review`, {
+    const payload: any = {
       action: reviewAction.value,
       notes: reviewNotes.value,
-    })
-    reviewMessage.value = response.data.message || 'Berhasil memproses pengajuan sekolah.'
-    setTimeout(() => {
-      showReviewModal.value = false
+    }
+    if (reviewAction.value === 'approve' && adminPassword.value.trim()) {
+      payload.admin_password = adminPassword.value.trim()
+    }
+
+    const response = await api.post(`/admin/school-registrations/${selectedRegistration.value.id}/review`, payload)
+    
+    if (response.data.data?.admin_account) {
+      approvedAccount.value = response.data.data.admin_account
+      reviewMessage.value = response.data.message
       fetchData()
-    }, 1200)
+    } else {
+      reviewMessage.value = response.data.message || 'Berhasil memproses pengajuan sekolah.'
+      setTimeout(() => {
+        showReviewModal.value = false
+        fetchData()
+      }, 1200)
+    }
   } catch (err: any) {
     reviewMessage.value = err.response?.data?.message || 'Gagal memproses peninjauan.'
   } finally {
     submittingReview.value = false
   }
+}
+
+function copyCredentials() {
+  if (!approvedAccount.value) return
+  const text = `Kredensial Admin Sekolah Prestasiku:\nUsername: ${approvedAccount.value.username}\nEmail: ${approvedAccount.value.email}\nPassword: ${approvedAccount.value.temporary_password}\nLogin: http://localhost:5173/login`
+  navigator.clipboard.writeText(text)
+  copied.value = true
+  setTimeout(() => (copied.value = false), 2000)
 }
 
 async function toggleSchoolStatus(school: any) {
@@ -163,7 +190,7 @@ onMounted(() => {
               </tr>
               <tr v-for="reg in registrations" :key="reg.id" class="hover:bg-slate-50/50 transition-colors">
                 <td class="px-6 py-4">
-                  <div class="font-bold text-slate-900">{{ reg.name }}</div>
+                  <div class="font-bold text-slate-900">{{ reg.school_name || reg.name }}</div>
                   <div class="text-[11px] text-slate-400 font-mono">NPSN: {{ reg.npsn }}</div>
                 </td>
                 <td class="px-6 py-4 uppercase font-semibold text-slate-700">
@@ -276,19 +303,89 @@ onMounted(() => {
       <Modal
         v-model="showReviewModal"
         :title="reviewAction === 'approve' ? 'Setujui Pendaftaran Sekolah' : 'Tolak Pendaftaran Sekolah'"
-        :subtitle="selectedRegistration?.name"
+        :subtitle="selectedRegistration?.school_name || selectedRegistration?.name"
         size="md"
       >
-        <div v-if="reviewMessage" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl text-xs text-center font-bold">
+        <!-- Success / Credentials State -->
+        <div v-if="approvedAccount" class="space-y-4 p-2">
+          <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-2">
+            <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-lg">
+              <i class="fa-solid fa-check"></i>
+            </div>
+            <h4 class="text-sm font-bold text-emerald-900">Pendaftaran Disetujui & Akun Aktif!</h4>
+            <p class="text-xs text-emerald-700">Akun Admin Sekolah telah berhasil dibuat. Silakan teruskan informasi login ini kepada pihak PIC sekolah.</p>
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2.5 text-xs font-mono">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-200">
+              <span class="text-slate-500 font-sans font-semibold">Instansi Sekolah:</span>
+              <span class="font-bold text-slate-800 text-right font-sans">{{ selectedRegistration?.school_name || selectedRegistration?.name }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500 font-sans">NPSN:</span>
+              <span class="font-bold text-slate-800">{{ selectedRegistration?.npsn }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500 font-sans">Username:</span>
+              <span class="font-bold text-brand-blue">{{ approvedAccount.username }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500 font-sans">Email PIC:</span>
+              <span class="font-bold text-slate-800">{{ approvedAccount.email }}</span>
+            </div>
+            <div class="flex justify-between items-center bg-amber-50/80 p-2.5 rounded-xl border border-amber-200/60">
+              <span class="text-amber-900 font-sans font-semibold">Password Login:</span>
+              <span class="font-bold text-amber-950 font-mono text-sm bg-white px-2 py-0.5 rounded border border-amber-300">{{ approvedAccount.temporary_password }}</span>
+            </div>
+          </div>
+
+          <div class="pt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              @click="copyCredentials"
+              class="px-4 py-2 text-xs font-bold bg-brand-navy hover:bg-[#001442] text-white rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+            >
+              <i class="fa-solid" :class="copied ? 'fa-check text-emerald-400' : 'fa-copy text-brand-gold'"></i>
+              <span>{{ copied ? 'Tersalin ke Clipboard!' : 'Salin Kredensial' }}</span>
+            </button>
+            <button
+              type="button"
+              @click="showReviewModal = false"
+              class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+            >
+              Selesai & Tutup
+            </button>
+          </div>
+        </div>
+
+        <!-- Review Rejection Message -->
+        <div v-else-if="reviewMessage" class="p-4 bg-rose-50 text-rose-800 rounded-xl text-xs text-center font-bold">
           {{ reviewMessage }}
         </div>
 
+        <!-- Form State -->
         <form v-else @submit.prevent="submitReview" class="space-y-4">
           <div class="text-xs text-slate-600 bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-1">
             <p><span class="font-semibold">NPSN:</span> {{ selectedRegistration?.npsn }}</p>
-            <p><span class="font-semibold">Nama:</span> {{ selectedRegistration?.name }}</p>
-            <p><span class="font-semibold">Email:</span> {{ selectedRegistration?.email }}</p>
+            <p><span class="font-semibold">Nama:</span> {{ selectedRegistration?.school_name || selectedRegistration?.name }}</p>
+            <p><span class="font-semibold">Email:</span> {{ selectedRegistration?.pic_email || selectedRegistration?.email }}</p>
             <p><span class="font-semibold">PIC:</span> {{ selectedRegistration?.pic_name }} ({{ selectedRegistration?.pic_phone }})</p>
+          </div>
+
+          <!-- Optional Custom Admin Password if approving -->
+          <div v-if="reviewAction === 'approve'" class="space-y-1">
+            <label class="block text-xs font-semibold text-slate-700">
+              Password Akun Admin Sekolah (Opsional)
+            </label>
+            <input
+              v-model="adminPassword"
+              type="text"
+              placeholder="Default: password123"
+              class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue font-mono"
+            />
+            <p class="text-[11px] text-slate-500">
+              Biarkan kosong jika ingin memakai password bawaan: <span class="font-mono font-bold text-emerald-700">password123</span> (rincian akun otomatis dikirimkan ke email PIC).
+            </p>
           </div>
 
           <div>

@@ -19,7 +19,6 @@ function handleLogout() {
   router.push('/login')
 }
 </script>
-
 <template>
   <header class="sticky top-0 z-40 w-full bg-brand-navy border-b border-white/10 shadow-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -52,7 +51,6 @@ function handleLogout() {
             active-class="text-brand-gold font-bold bg-white/10"
             class="px-3.5 py-2 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <i class="fa-solid fa-trophy mr-1.5 text-brand-gold"></i>
             Katalog Kompetisi
           </router-link>
           <router-link
@@ -60,7 +58,6 @@ function handleLogout() {
             active-class="text-brand-gold font-bold bg-white/10"
             class="px-3.5 py-2 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <i class="fa-solid fa-qrcode mr-1.5 text-sky-300"></i>
             Cek QR Prestasi
           </router-link>
         </nav>

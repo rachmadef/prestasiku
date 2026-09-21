@@ -114,7 +114,7 @@ onMounted(() => {
               class="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between"
             >
               <div>
-                <h3 class="text-xs font-bold text-slate-800">{{ reg.name }}</h3>
+                <h3 class="text-xs font-bold text-slate-800">{{ reg.school_name || reg.name }}</h3>
                 <p class="text-[11px] text-slate-500 mt-0.5">NPSN: {{ reg.npsn }} • {{ reg.city }}, {{ reg.province }}</p>
                 <p class="text-[10px] text-slate-400 mt-1">PIC: {{ reg.pic_name }} ({{ reg.pic_phone }})</p>
               </div>

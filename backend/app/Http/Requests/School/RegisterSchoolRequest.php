@@ -11,6 +11,18 @@ class RegisterSchoolRequest extends FormRequest
         return true;
     }
 
+    /**
+     * Prepare inputs before validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name') && !$this->filled('school_name')) {
+            $this->merge([
+                'school_name' => $this->input('name'),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         return [

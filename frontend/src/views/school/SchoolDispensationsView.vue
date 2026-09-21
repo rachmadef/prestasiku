@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import Modal from '@/components/common/Modal.vue'
-import SearchableSelect from '@/components/common/SearchableSelect.vue'
 import api, { extractList } from '@/services/api'
 import { useNotify } from '@/composables/useNotify'
 
@@ -25,6 +24,7 @@ const reviewing = ref(false)
 // Direct Create Dispensation Modal
 const showCreateModal = ref(false)
 const creating = ref(false)
+const formSchema = ref<any[]>([])
 const createForm = ref({
   competition_name: '',
   dispensation_type: 'persiapan_latihan',
@@ -38,36 +38,35 @@ const createForm = ref({
   student_ids: [] as number[],
   reference_number: '',
   notes: '',
+  custom_fields_data: {} as Record<string, any>,
 })
 
 // Print Letter Preview Modal
 const showPrintModal = ref(false)
 const printData = ref<any>(null)
 
-const studentOptions = computed(() => {
-  return students.value.map((s: any) => ({
-    value: s.id,
-    label: s.full_name,
-    sublabel: `NIS: ${s.nis || '-'} • Kelas ${s.class_name || '-'}`,
-    badge: s.grade_level ? `Tingkat ${s.grade_level}` : undefined,
-  }))
-})
-
 async function fetchData() {
   loading.value = true
   try {
-    const [dispRes, studRes] = await Promise.all([
+    const [dispRes, studRes, schemaRes] = await Promise.all([
       api.get('/school/dispensations'),
       api.get('/school/students').catch(() => ({ data: { data: [] } })),
+      api.get('/school/dispensations/form-schema').catch(() => ({ data: { data: { schema: [] } } })),
     ])
     dispensations.value = extractList(dispRes.data.data)
     students.value = extractList(studRes.data.data)
+    formSchema.value = schemaRes.data?.data?.schema || []
   } catch (err) {
     console.error('Error fetching school dispensations:', err)
   } finally {
     loading.value = false
   }
 }
+
+// Operational counts
+const pendingCount = computed(() => dispensations.value.filter((d: any) => d.status === 'pending').length)
+const approvedCount = computed(() => dispensations.value.filter((d: any) => d.status === 'approved').length)
+const rejectedCount = computed(() => dispensations.value.filter((d: any) => d.status === 'rejected').length)
 
 const filteredDispensations = computed(() => {
   return dispensations.value.filter((d: any) => {
@@ -125,6 +124,61 @@ async function openPrintPreview(dispId: number) {
   }
 }
 
+const downloadingDocx = ref(false)
+const downloadingPdf = ref(false)
+
+async function downloadDocx(dispId: number, refNumber: string) {
+  downloadingDocx.value = true
+  try {
+    const res = await api.get(`/school/dispensations/${dispId}/download-docx`, {
+      responseType: 'blob',
+    })
+    const blob = new Blob([res.data], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const safeName = (refNumber || 'KBM').replace(/[^a-zA-Z0-9_-]/g, '_')
+    a.download = `Surat_Dispensasi_${safeName}.docx`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    toast.success('Dokumen Word (.docx) berhasil diunduh.', 'Unduh Berhasil')
+  } catch (err: any) {
+    toast.error('Gagal mengunduh berkas DOCX.', 'Gagal Unduh')
+  } finally {
+    downloadingDocx.value = false
+  }
+}
+
+async function downloadPdf(dispId: number, refNumber: string) {
+  downloadingPdf.value = true
+  try {
+    const res = await api.get(`/school/dispensations/${dispId}/download-pdf`, {
+      responseType: 'blob',
+    })
+    const blob = new Blob([res.data], {
+      type: 'application/pdf',
+    })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const safeName = (refNumber || 'KBM').replace(/[^a-zA-Z0-9_-]/g, '_')
+    a.download = `Surat_Dispensasi_${safeName}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    toast.success('Dokumen PDF berhasil diunduh.', 'Unduh Berhasil')
+  } catch (err: any) {
+    toast.error('Gagal mengunduh berkas PDF.', 'Gagal Unduh')
+  } finally {
+    downloadingPdf.value = false
+  }
+}
+
 function handlePrintAction() {
   window.print()
 }
@@ -159,6 +213,7 @@ async function handleCreateDirect() {
       student_ids: [],
       reference_number: '',
       notes: '',
+      custom_fields_data: {},
     }
     fetchData()
   } catch (err: any) {
@@ -175,164 +230,254 @@ onMounted(() => {
 
 <template>
   <DashboardLayout>
-    <div class="space-y-6">
-      <!-- Header Banner -->
-      <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-xs border border-slate-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
-        <div class="space-y-2 max-w-2xl">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-navy/10 text-brand-navy text-xs font-bold">
-            <i class="fa-solid fa-file-signature text-brand-gold"></i>
-            Layanan Kesiswaan & Kurikulum
+    <template #header-title>Perizinan Dispensasi Belajar (KBM)</template>
+
+    <div class="space-y-6 max-w-7xl mx-auto">
+      <!-- Humanized Administrative Top Section -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div class="space-y-1.5 max-w-2xl">
+          <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold">
+            <i class="fa-solid fa-file-signature text-brand-navy"></i>
+            Pelayanan Administrasi Kesiswaan & Kurikulum
           </div>
-          <h1 class="text-2xl sm:text-3xl font-black text-brand-navy tracking-tight">Manajemen Dispensasi KBM</h1>
-          <p class="text-sm text-slate-600 leading-relaxed">
-            Kelola persetujuan perizinan tidak mengikuti Kegiatan Belajar Mengajar (KBM) bagi siswa yang sedang latihan intensif atau bertanding lomba. Terbitkan Surat Dispensasi resmi lengkap dengan QR Code verifikasi guru.
+          <h2 class="text-xl sm:text-2xl font-black text-brand-navy tracking-tight">
+            Manajemen Surat Izin Dispensasi KBM
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Kelola persetujuan izin bagi siswa yang menjalani persiapan, bimbingan intensif, maupun keberangkatan lomba agar tetap tercatat resmi dan tidak dianggap alpa oleh guru kelas.
           </p>
         </div>
-        <div class="flex items-center gap-3">
-          <button
-            @click="showCreateModal = true"
-            class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-brand-navy text-white text-xs font-bold shadow-md hover:bg-blue-900 transition-all cursor-pointer"
+
+        <div class="flex items-center gap-2.5 shrink-0">
+          <router-link
+            to="/school/dispensations/form-settings"
+            class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 shadow-2xs transition-all cursor-pointer"
+            title="Kustomisasi Format Surat, Kop Sekolah, dan Kolom Formulir Siswa"
           >
-            <i class="fa-solid fa-plus text-brand-gold"></i>
-            <span>Terbitkan Dispensasi Langsung</span>
+            <i class="fa-solid fa-stamp text-brand-navy"></i>
+            <span>Format Surat & Kop</span>
+          </router-link>
+
+          <button
+            type="button"
+            @click="showCreateModal = true"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-navy text-white text-xs font-bold shadow-xs hover:bg-[#00164a] transition-all cursor-pointer"
+          >
+            <i class="fa-solid fa-circle-plus text-brand-gold"></i>
+            <span>Terbitkan Surat Dispensasi</span>
           </button>
         </div>
       </div>
 
-      <!-- Filters & Search Bar -->
-      <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-        <!-- Status Tabs -->
-        <div class="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+      <!-- Operational Status Ledger (Clean, practical tiles) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Tile 1: Pending Review -->
+        <div
+          :class="[
+            'bg-white rounded-xl p-4 border transition-all cursor-pointer',
+            statusFilter === 'pending' ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-200/80 hover:border-slate-300'
+          ]"
+          @click="statusFilter = statusFilter === 'pending' ? 'all' : 'pending'"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">Perlu Tindakan / Menunggu Persetujuan</span>
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span class="text-2xl font-black text-amber-600 font-mono">{{ pendingCount }}</span>
+            <span class="text-xs text-slate-500 font-medium">permohonan diajukan</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">Siswa menunggu surat pengesahan kesiswaan</p>
+        </div>
+
+        <!-- Tile 2: Approved Active -->
+        <div
+          :class="[
+            'bg-white rounded-xl p-4 border transition-all cursor-pointer',
+            statusFilter === 'approved' ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-slate-200/80 hover:border-slate-300'
+          ]"
+          @click="statusFilter = statusFilter === 'approved' ? 'all' : 'approved'"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">Surat Disetujui & Resmi Terbit</span>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span class="text-2xl font-black text-emerald-700 font-mono">{{ approvedCount }}</span>
+            <span class="text-xs text-slate-500 font-medium">surat sah</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">Dapat dicetak atau dicek via QR guru</p>
+        </div>
+
+        <!-- Tile 3: Total Archive -->
+        <div
+          :class="[
+            'bg-white rounded-xl p-4 border transition-all cursor-pointer',
+            statusFilter === 'all' ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200/80 hover:border-slate-300'
+          ]"
+          @click="statusFilter = 'all'"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">Total Arsip Dispensasi Belajar</span>
+            <i class="fa-solid fa-folder-closed text-slate-400 text-xs"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span class="text-2xl font-black text-brand-navy font-mono">{{ dispensations.length }}</span>
+            <span class="text-xs text-slate-500 font-medium">dokumen tercatat</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">{{ rejectedCount }} permohonan ditolak</p>
+        </div>
+      </div>
+
+      <!-- Filter Controls & Search -->
+      <div class="bg-white rounded-xl p-3 sm:p-4 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+        <!-- Filter Tabs -->
+        <div class="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
           <button
+            type="button"
             @click="statusFilter = 'all'"
             :class="[
-              'px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap',
               statusFilter === 'all'
                 ? 'bg-brand-navy text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                : 'text-slate-600 hover:bg-slate-100'
             ]"
           >
             Semua ({{ dispensations.length }})
           </button>
           <button
+            type="button"
             @click="statusFilter = 'pending'"
             :class="[
-              'px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5',
               statusFilter === 'pending'
                 ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                : 'text-slate-600 hover:bg-slate-100'
             ]"
           >
-            Menunggu Review ({{ dispensations.filter((d: any) => d.status === 'pending').length }})
+            <span>Menunggu Tindakan</span>
+            <span v-if="pendingCount > 0" class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-200 text-amber-900 font-bold">
+              {{ pendingCount }}
+            </span>
           </button>
           <button
+            type="button"
             @click="statusFilter = 'approved'"
             :class="[
-              'px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap',
               statusFilter === 'approved'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-emerald-700 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
             ]"
           >
-            Disetujui ({{ dispensations.filter((d: any) => d.status === 'approved').length }})
+            Disetujui ({{ approvedCount }})
           </button>
           <button
+            type="button"
             @click="statusFilter = 'rejected'"
             :class="[
-              'px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap',
               statusFilter === 'rejected'
-                ? 'bg-red-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-red-700 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
             ]"
           >
-            Ditolak ({{ dispensations.filter((d: any) => d.status === 'rejected').length }})
+            Ditolak ({{ rejectedCount }})
           </button>
         </div>
 
         <!-- Search Input -->
-        <div class="relative w-full md:w-72">
-          <i class="fa-solid fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <div class="relative w-full md:w-80">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Cari siswa, kegiatan, no surat..."
-            class="w-full text-xs rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+            placeholder="Cari siswa, nama kegiatan, no surat..."
+            class="w-full text-xs rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-slate-700 placeholder-slate-400 focus:outline-hidden focus:bg-white focus:border-brand-navy focus:ring-1 focus:ring-brand-navy transition-all"
           />
         </div>
       </div>
 
-      <!-- Dispensations Table -->
-      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div v-if="loading" class="p-16 text-center">
-          <i class="fa-solid fa-circle-notch fa-spin text-3xl text-brand-navy"></i>
-          <p class="text-xs text-slate-500 mt-2">Memuat daftar dispensasi...</p>
+      <!-- Main Data Table Container -->
+      <div class="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div v-if="loading" class="py-16 text-center">
+          <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-navy"></i>
+          <p class="text-xs text-slate-500 mt-2 font-medium">Memuat data perizinan dispensasi...</p>
         </div>
 
-        <div v-else-if="filteredDispensations.length === 0" class="p-16 text-center">
-          <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-2xl mb-4">
-            <i class="fa-solid fa-file-circle-question"></i>
+        <div v-else-if="filteredDispensations.length === 0" class="py-16 text-center">
+          <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-lg mb-3">
+            <i class="fa-regular fa-folder-open"></i>
           </div>
-          <h3 class="text-base font-bold text-slate-800">Tidak Ditemukan Data Dispensasi</h3>
+          <h3 class="text-sm font-bold text-slate-800">Tidak Ditemukan Data Dispensasi</h3>
           <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-            Belum ada permohonan dispensasi KBM yang sesuai dengan filter atau pencarian Anda.
+            Belum ada permohonan atau surat dispensasi yang sesuai dengan kriteria filter saat ini.
           </p>
         </div>
 
         <div v-else class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-slate-600">
-            <thead class="bg-slate-50 border-b border-slate-200/80 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200/80 uppercase tracking-wider text-[10px]">
               <tr>
-                <th class="px-5 py-3.5">Nomor & Kegiatan</th>
-                <th class="px-5 py-3.5">Siswa Terlibat</th>
-                <th class="px-5 py-3.5">Periode & Waktu</th>
-                <th class="px-5 py-3.5">Jenis & Pembimbing</th>
-                <th class="px-5 py-3.5">Status</th>
-                <th class="px-5 py-3.5 text-right">Aksi</th>
+                <th class="px-4 py-3">Nomor & Kegiatan</th>
+                <th class="px-4 py-3">Siswa Penerima Izin</th>
+                <th class="px-4 py-3">Jadwal Pelaksanaan</th>
+                <th class="px-4 py-3">Jenis & Pembimbing</th>
+                <th class="px-4 py-3">Status Izin</th>
+                <th class="px-4 py-3 text-right">Tindakan</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-100 text-slate-700">
               <tr
                 v-for="item in filteredDispensations"
                 :key="item.id"
-                class="hover:bg-slate-50/60 transition-colors"
+                class="hover:bg-slate-50/80 transition-colors"
               >
                 <!-- Nomor & Kegiatan -->
-                <td class="px-5 py-4 max-w-xs">
-                  <p class="font-bold text-brand-navy text-sm">{{ item.competition_name }}</p>
-                  <p class="font-mono text-[11px] text-slate-400 mt-0.5">{{ item.reference_number || 'Belum terbit nomor' }}</p>
-                  <p class="text-[11px] text-slate-500 truncate mt-1 italic">"{{ item.purpose }}"</p>
+                <td class="px-4 py-3.5 max-w-xs">
+                  <p class="font-bold text-slate-900 text-xs leading-snug">
+                    {{ item.competition_name }}
+                  </p>
+                  <p class="font-mono text-[11px] text-slate-500 mt-0.5">
+                    {{ item.reference_number || 'Nomor surat belum diterbitkan' }}
+                  </p>
+                  <p class="text-[11px] text-slate-500 truncate mt-1 italic">
+                    "{{ item.purpose }}"
+                  </p>
                 </td>
 
-                <!-- Siswa Terlibat -->
-                <td class="px-5 py-4">
+                <!-- Siswa Penerima Izin -->
+                <td class="px-4 py-3.5">
                   <div class="space-y-1">
                     <div
-                      v-for="s in (item.students || []).slice(0, 3)"
+                      v-for="s in (item.students || []).slice(0, 2)"
                       :key="s.id"
-                      class="flex items-center gap-1.5 text-slate-800 font-medium"
+                      class="flex items-center gap-1.5 font-medium text-slate-800"
                     >
-                      <i class="fa-solid fa-user-graduate text-[10px] text-brand-navy"></i>
+                      <i class="fa-solid fa-user-graduate text-[10px] text-brand-blue"></i>
                       <span>{{ s.full_name }}</span>
-                      <span class="text-[10px] text-slate-400">({{ s.class_name }})</span>
+                      <span class="text-[10px] text-slate-400 font-normal">({{ s.class_name }})</span>
                     </div>
-                    <p v-if="(item.students || []).length > 3" class="text-[10px] text-blue-600 font-bold">
-                      +{{ item.students.length - 3 }} siswa lainnya
+                    <p v-if="(item.students || []).length > 2" class="text-[10px] font-bold text-brand-blue">
+                      +{{ item.students.length - 2 }} siswa lainnya
                     </p>
                   </div>
                 </td>
 
-                <!-- Periode & Waktu -->
-                <td class="px-5 py-4 whitespace-nowrap">
-                  <p class="font-bold text-slate-700">{{ item.start_date }} s.d. {{ item.end_date }}</p>
+                <!-- Jadwal Pelaksanaan -->
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                  <p class="font-semibold text-slate-800">
+                    {{ item.start_date }} <span class="text-slate-400 font-normal">s.d.</span> {{ item.end_date }}
+                  </p>
                   <p class="text-[11px] text-slate-500 mt-0.5">
-                    {{ item.is_all_day ? 'Seharian Penuh' : `${item.start_time || '-'} - ${item.end_time || '-'}` }}
+                    {{ item.is_all_day ? 'Seharian Penuh' : `${item.start_time || '-'} s.d. ${item.end_time || '-'}` }}
                   </p>
                 </td>
 
                 <!-- Jenis & Pembimbing -->
-                <td class="px-5 py-4">
-                  <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-800 border border-blue-200">
-                    {{ item.dispensation_type === 'persiapan_latihan' ? 'Persiapan / Latihan' : 'Hari Lomba' }}
+                <td class="px-4 py-3.5">
+                  <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                    {{ item.dispensation_type === 'persiapan_latihan' ? 'Latihan / Persiapan' : 'Hari Pelaksanaan' }}
                   </span>
                   <p v-if="item.supervisor_name" class="text-[11px] text-slate-600 mt-1">
                     <i class="fa-solid fa-chalkboard-user mr-1 text-slate-400"></i>
@@ -340,49 +485,51 @@ onMounted(() => {
                   </p>
                 </td>
 
-                <!-- Status -->
-                <td class="px-5 py-4 whitespace-nowrap">
+                <!-- Status Izin -->
+                <td class="px-4 py-3.5 whitespace-nowrap">
                   <span
                     v-if="item.status === 'approved'"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200"
                   >
-                    <i class="fa-solid fa-check"></i>
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     Disetujui
                   </span>
                   <span
                     v-else-if="item.status === 'rejected'"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-300"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200"
                   >
-                    <i class="fa-solid fa-xmark"></i>
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                     Ditolak
                   </span>
                   <span
                     v-else
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
                   >
-                    <i class="fa-solid fa-clock"></i>
-                    Pending Review
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    Menunggu Review
                   </span>
                 </td>
 
-                <!-- Aksi -->
-                <td class="px-5 py-4 text-right whitespace-nowrap">
-                  <div class="inline-flex items-center gap-1.5">
+                <!-- Tindakan -->
+                <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                  <div class="inline-flex items-center gap-2">
                     <button
                       v-if="item.status === 'pending'"
+                      type="button"
                       @click="openReviewModal(item)"
-                      class="px-3 py-1.5 rounded-lg bg-brand-navy text-white text-xs font-bold hover:bg-blue-900 shadow-xs cursor-pointer"
+                      class="px-3 py-1.5 rounded-lg bg-brand-navy text-white text-xs font-bold hover:bg-[#00164a] transition-all cursor-pointer"
                     >
-                      Review
+                      Tinjau
                     </button>
 
                     <button
                       v-if="item.status === 'approved'"
+                      type="button"
                       @click="openPrintPreview(item.id)"
-                      class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold cursor-pointer"
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer border border-slate-200"
                       title="Cetak Surat Dispensasi Resmi"
                     >
-                      <i class="fa-solid fa-print"></i>
+                      <i class="fa-solid fa-print text-slate-500"></i>
                       <span>Cetak Surat</span>
                     </button>
                   </div>
@@ -395,37 +542,44 @@ onMounted(() => {
     </div>
 
     <!-- Review Modal -->
-    <Modal v-model="showReviewModal" title="Tinjau Permohonan Dispensasi KBM" @close="showReviewModal = false">
-      <div v-if="selectedDisp" class="space-y-4">
-        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
-          <div>
-            <span class="text-slate-400 block text-[10px] uppercase font-bold">Kegiatan Lomba</span>
-            <span class="font-bold text-slate-800 text-sm">{{ selectedDisp.competition_name }}</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
+    <Modal v-model="showReviewModal" title="Tinjauan Surat Dispensasi Belajar" @close="showReviewModal = false">
+      <div v-if="selectedDisp" class="space-y-4 text-xs">
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div class="flex justify-between items-start">
             <div>
-              <span class="text-slate-400 block text-[10px] uppercase font-bold">Periode Dispensasi</span>
-              <span class="font-semibold text-slate-700">{{ selectedDisp.start_date }} s.d. {{ selectedDisp.end_date }}</span>
+              <p class="text-[10px] uppercase font-bold text-slate-400">Kegiatan Lomba</p>
+              <p class="text-sm font-bold text-brand-navy mt-0.5">{{ selectedDisp.competition_name }}</p>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-700">
+              {{ selectedDisp.dispensation_type === 'persiapan_latihan' ? 'Latihan / Persiapan' : 'Hari Pelaksanaan' }}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400">Periode Izin</p>
+              <p class="font-semibold text-slate-800">{{ selectedDisp.start_date }} s.d. {{ selectedDisp.end_date }}</p>
             </div>
             <div>
-              <span class="text-slate-400 block text-[10px] uppercase font-bold">Guru Pembimbing</span>
-              <span class="font-semibold text-slate-700">{{ selectedDisp.supervisor_name || 'Tidak dicantumkan' }}</span>
+              <p class="text-[10px] uppercase font-bold text-slate-400">Guru Pendamping</p>
+              <p class="font-semibold text-slate-800">{{ selectedDisp.supervisor_name || 'Tidak dicantumkan' }}</p>
             </div>
           </div>
+
           <div>
-            <span class="text-slate-400 block text-[10px] uppercase font-bold">Uraian / Alasan</span>
-            <p class="text-slate-700">{{ selectedDisp.purpose }}</p>
+            <p class="text-[10px] uppercase font-bold text-slate-400">Keperluan / Keterangan</p>
+            <p class="text-slate-700 mt-0.5">{{ selectedDisp.purpose }}</p>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Keputusan Persetujuan *</label>
+          <label class="block font-bold text-slate-700 mb-2">Keputusan Kesiswaan *</label>
           <div class="grid grid-cols-2 gap-3">
             <label
               :class="[
                 'p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all',
                 reviewAction === 'approve'
-                  ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
+                  ? 'bg-emerald-50 border-emerald-600 text-emerald-900 ring-1 ring-emerald-600'
                   : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               ]"
             >
@@ -438,44 +592,44 @@ onMounted(() => {
               :class="[
                 'p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all',
                 reviewAction === 'reject'
-                  ? 'bg-red-50 border-red-500 text-red-800'
+                  ? 'bg-rose-50 border-rose-600 text-rose-900 ring-1 ring-rose-600'
                   : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               ]"
             >
               <input type="radio" v-model="reviewAction" value="reject" class="sr-only" />
-              <i class="fa-solid fa-circle-xmark text-red-600"></i>
-              <span>Tolak Dispensasi</span>
+              <i class="fa-solid fa-circle-xmark text-rose-600"></i>
+              <span>Tolak Permohonan</span>
             </label>
           </div>
         </div>
 
         <div v-if="reviewAction === 'approve'">
-          <label class="block text-xs font-bold text-slate-700 mb-1">Nomor Surat Dispensasi Resmi (Opsional)</label>
+          <label class="block font-bold text-slate-700 mb-1">Nomor Surat Dinas (Opsional)</label>
           <input
             v-model="referenceNumberInput"
             type="text"
-            placeholder="Kosongkan untuk nomor surat otomatis sistem"
-            class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+            placeholder="Kosongkan untuk penomoran otomatis sistem (421.3/...)"
+            class="w-full text-xs rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
           />
-          <p class="text-[10px] text-slate-400 mt-1">Sistem akan mengenerate format resmi sekolah jika dikosongkan.</p>
+          <p class="text-[10px] text-slate-400 mt-1">Format penomoran standar sekolah akan diterapkan jika dikosongkan.</p>
         </div>
 
         <div v-if="reviewAction === 'reject'">
-          <label class="block text-xs font-bold text-slate-700 mb-1">Alasan Penolakan *</label>
+          <label class="block font-bold text-slate-700 mb-1">Alasan Penolakan Izin *</label>
           <textarea
             v-model="rejectionReasonInput"
             rows="2"
             required
-            placeholder="Jelaskan alasan dispensasi tidak dapat diberikan..."
-            class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500"
+            placeholder="Jelaskan alasan penolakan untuk siswa pemohon..."
+            class="w-full text-xs rounded-lg border border-slate-300 p-2.5 focus:border-rose-500 focus:outline-hidden"
           ></textarea>
         </div>
 
-        <div class="pt-4 border-t border-slate-200 flex justify-end gap-2">
+        <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
           <button
             type="button"
             @click="showReviewModal = false"
-            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+            class="px-4 py-2 rounded-lg font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
           >
             Batal
           </button>
@@ -483,36 +637,36 @@ onMounted(() => {
             type="button"
             @click="submitReview"
             :disabled="reviewing"
-            class="px-5 py-2 rounded-xl text-xs font-bold bg-brand-navy text-white hover:bg-blue-900 disabled:opacity-50 transition-all flex items-center gap-2"
+            class="px-5 py-2 rounded-lg font-bold bg-brand-navy text-white hover:bg-[#00164a] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
           >
             <i v-if="reviewing" class="fa-solid fa-circle-notch fa-spin"></i>
-            <span>{{ reviewing ? 'Memproses...' : 'Simpan Keputusan' }}</span>
+            <span>{{ reviewing ? 'Menyimpan...' : 'Simpan Keputusan' }}</span>
           </button>
         </div>
       </div>
     </Modal>
 
     <!-- Create Direct Dispensation Modal -->
-    <Modal v-model="showCreateModal" title="Terbitkan Surat Dispensasi KBM Langsung" @close="showCreateModal = false">
-      <form @submit.prevent="handleCreateDirect" class="space-y-4">
+    <Modal v-model="showCreateModal" title="Penerbitan Surat Dispensasi Belajar Langsung" @close="showCreateModal = false">
+      <form @submit.prevent="handleCreateDirect" class="space-y-4 text-xs">
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lomba / Kegiatan *</label>
+          <label class="block font-bold text-slate-700 mb-1">Nama Lomba / Kegiatan *</label>
           <input
             v-model="createForm.competition_name"
             type="text"
             required
-            placeholder="Contoh: Lomba Debat Bahasa Inggris Tingkat Provinsi 2026"
-            class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+            placeholder="Contoh: Lomba Cerdas Cermat Fisika UNY 2026"
+            class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
           />
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Jenis Dispensasi *</label>
+            <label class="block font-bold text-slate-700 mb-1">Jenis Izin *</label>
             <select
               v-model="createForm.dispensation_type"
               required
-              class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
             >
               <option value="persiapan_latihan">Persiapan & Latihan Intensif</option>
               <option value="pelaksanaan_lomba">Hari-H Pelaksanaan Lomba</option>
@@ -520,195 +674,386 @@ onMounted(() => {
             </select>
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Guru Pendamping / Pembimbing</label>
+            <label class="block font-bold text-slate-700 mb-1">Guru Pendamping / Pembina</label>
             <input
               v-model="createForm.supervisor_name"
               type="text"
-              placeholder="Contoh: Dra. Sri Wahyuni, M.Pd."
-              class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+              placeholder="Contoh: Dra. Hj. Siti Aminah, M.Pd."
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
             />
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Pilih Siswa yang Diberi Dispensasi *</label>
-          <div class="space-y-2">
-            <select
-              multiple
-              v-model="createForm.student_ids"
-              required
-              class="w-full h-28 text-xs rounded-xl border border-slate-300 p-2 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
-            >
-              <option v-for="s in students" :key="s.id" :value="s.id">
-                {{ s.full_name }} ({{ s.class_name }} - NIS: {{ s.nis }})
-              </option>
-            </select>
-            <p class="text-[10px] text-slate-400">Tekan tombol Ctrl (Windows) atau Cmd (Mac) untuk memilih beberapa siswa sekaligus.</p>
-          </div>
+          <label class="block font-bold text-slate-700 mb-1">Pilih Siswa yang Diberi Dispensasi *</label>
+          <select
+            multiple
+            v-model="createForm.student_ids"
+            required
+            class="w-full h-32 rounded-lg border border-slate-300 p-2 focus:border-brand-navy focus:outline-hidden font-sans"
+          >
+            <option v-for="s in students" :key="s.id" :value="s.id" class="py-1">
+              {{ s.full_name }} — Kelas {{ s.class_name }} (NIS: {{ s.nis }})
+            </option>
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">Gunakan tombol Ctrl / Cmd untuk memilih lebih dari 1 siswa sekaligus.</p>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Alasan / Uraian Dispensasi *</label>
+          <label class="block font-bold text-slate-700 mb-1">Uraian / Tujuan Dispensasi *</label>
           <textarea
             v-model="createForm.purpose"
             rows="2"
             required
-            placeholder="Contoh: Mengikuti sesi gladi bersih dan perlombaan tingkat provinsi."
-            class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+            placeholder="Contoh: Mengikuti karantina materi dan simulasi babak final di laboratorium sekolah."
+            class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
           ></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Mulai *</label>
+            <label class="block font-bold text-slate-700 mb-1">Tanggal Mulai Izin *</label>
             <input
               v-model="createForm.start_date"
               type="date"
               required
-              class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
             />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Selesai *</label>
+            <label class="block font-bold text-slate-700 mb-1">Tanggal Selesai Izin *</label>
             <input
               v-model="createForm.end_date"
               type="date"
               required
-              class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
             />
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Nomor Surat Resmi (Opsional)</label>
+          <label class="block font-bold text-slate-700 mb-1">Nomor Surat Dinas (Opsional)</label>
           <input
             v-model="createForm.reference_number"
             type="text"
-            placeholder="Contoh: 421.3/DISP/2026/045"
-            class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:outline-hidden focus:ring-2 focus:ring-brand-gold focus:border-brand-gold"
+            placeholder="Contoh: 421.3/045/SMAN1/DISP/2026"
+            class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
           />
         </div>
 
-        <div class="pt-4 border-t border-slate-200 flex justify-end gap-2">
+        <!-- Dynamic Custom Fields from School Schema -->
+        <div v-if="formSchema && formSchema.length > 0" class="pt-4 border-t border-slate-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 text-brand-navy font-black text-xs">
+              <i class="fa-solid fa-sparkles text-brand-gold"></i>
+              <span>Kolom Khusus Sekolah</span>
+            </div>
+            <router-link
+              to="/school/dispensations/form-settings"
+              class="text-[10px] text-brand-navy hover:underline font-bold"
+              target="_blank"
+            >
+              Atur Kolom &rarr;
+            </router-link>
+          </div>
+
+          <div v-for="field in formSchema" :key="field.id" class="space-y-1">
+            <label class="block font-bold text-slate-700">
+              {{ field.label }}
+              <span v-if="field.is_required" class="text-rose-500">*</span>
+              <span v-else class="text-[10px] text-slate-400 font-normal"> (Opsional)</span>
+            </label>
+
+            <!-- Text Input -->
+            <input
+              v-if="field.type === 'text'"
+              v-model="createForm.custom_fields_data[field.name]"
+              type="text"
+              :placeholder="field.placeholder || ''"
+              :required="field.is_required"
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
+            />
+
+            <!-- Textarea -->
+            <textarea
+              v-else-if="field.type === 'textarea'"
+              v-model="createForm.custom_fields_data[field.name]"
+              rows="2"
+              :placeholder="field.placeholder || ''"
+              :required="field.is_required"
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
+            ></textarea>
+
+            <!-- Select Dropdown -->
+            <select
+              v-else-if="field.type === 'select'"
+              v-model="createForm.custom_fields_data[field.name]"
+              :required="field.is_required"
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
+            >
+              <option value="">-- Pilih {{ field.label }} --</option>
+              <option v-for="(opt, oIdx) in (field.options || [])" :key="oIdx" :value="opt">
+                {{ opt }}
+              </option>
+            </select>
+
+            <!-- Number -->
+            <input
+              v-else-if="field.type === 'number'"
+              v-model.number="createForm.custom_fields_data[field.name]"
+              type="number"
+              :placeholder="field.placeholder || '0'"
+              :required="field.is_required"
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
+            />
+
+            <!-- Date -->
+            <input
+              v-else-if="field.type === 'date'"
+              v-model="createForm.custom_fields_data[field.name]"
+              type="date"
+              :required="field.is_required"
+              class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
+            />
+
+            <!-- Checkbox -->
+            <label v-else-if="field.type === 'checkbox'" class="flex items-start gap-2 pt-1 cursor-pointer">
+              <input
+                type="checkbox"
+                v-model="createForm.custom_fields_data[field.name]"
+                :required="field.is_required"
+                class="mt-0.5 rounded border-slate-300 text-brand-navy focus:ring-brand-navy"
+              />
+              <span class="text-slate-700 leading-snug">{{ field.label }}</span>
+            </label>
+
+            <p v-if="field.description" class="text-[10px] text-slate-400 italic">
+              {{ field.description }}
+            </p>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
           <button
             type="button"
             @click="showCreateModal = false"
-            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+            class="px-4 py-2 rounded-lg font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
           >
             Batal
           </button>
           <button
             type="submit"
             :disabled="creating"
-            class="px-5 py-2 rounded-xl text-xs font-bold bg-brand-navy text-white hover:bg-blue-900 disabled:opacity-50 transition-all flex items-center gap-2"
+            class="px-5 py-2 rounded-lg font-bold bg-brand-navy text-white hover:bg-[#00164a] disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
           >
             <i v-if="creating" class="fa-solid fa-circle-notch fa-spin"></i>
-            <span>{{ creating ? 'Menerbitkan...' : 'Terbitkan Surat Dispensasi' }}</span>
+            <span>{{ creating ? 'Menerbitkan...' : 'Terbitkan Surat' }}</span>
           </button>
         </div>
       </form>
     </Modal>
 
-    <!-- Official Printable Dispensation Letter Preview Modal -->
-    <Modal v-model="showPrintModal" title="Cetak Surat Dispensasi Resmi Sekolah" @close="showPrintModal = false">
-      <div v-if="printData" class="space-y-6">
-        <!-- Printable Paper Container -->
-        <div id="printable-dispensation-letter" class="bg-white p-6 sm:p-8 rounded-xl border-2 border-slate-300 shadow-sm text-black font-serif space-y-4">
-          <!-- Kop Surat Sekolah -->
-          <div class="text-center border-b-2 border-black pb-3 space-y-1">
-            <h2 class="text-lg font-black uppercase tracking-wider">{{ printData.school?.name || 'SEKOLAH MENENGAH ATAS' }}</h2>
-            <p class="text-[11px] font-sans text-slate-700">
-              {{ printData.school?.address || 'Jalan Pendidikan No. 1' }} • NPSN: {{ printData.school?.npsn || '-' }}
-            </p>
-            <p class="text-[11px] font-sans text-slate-700">
-              Telp: {{ printData.school?.phone || '-' }} • Email: {{ printData.school?.email || '-' }}
+    <!-- Authentic Official Indonesian School Dispensation Letter (Print Preview Modal) -->
+    <Modal v-model="showPrintModal" title="Pratinjau Cetak Surat Resmi Sekolah" @close="showPrintModal = false">
+      <div v-if="printData" class="space-y-4 text-slate-800">
+        <!-- The Printable Paper Document (A4 Styling) -->
+        <div
+          id="printable-dispensation-letter"
+          class="bg-white p-8 sm:p-12 rounded-xl border border-slate-300 shadow-sm text-black font-serif space-y-4 max-w-2xl mx-auto"
+        >
+          <!-- Official Kop Surat Sekolah (Dukungan Gambar Kop / Teks Garis Ganda) -->
+          <div class="text-center pb-2">
+            <div v-if="printData.letterhead_type === 'image' && printData.letterhead_image_url" class="mb-2">
+              <img
+                :src="printData.letterhead_image_url"
+                alt="Kop Surat Sekolah"
+                class="max-h-28 object-contain w-auto mx-auto"
+              />
+            </div>
+            <div v-else>
+              <h2 class="text-base sm:text-lg font-black uppercase tracking-wider leading-tight">
+                {{ printData.letter_format_config?.institution_level1 || 'PEMERINTAH DAERAH PROVINSI' }}
+              </h2>
+              <p class="text-xs font-black uppercase tracking-wide text-slate-800 mt-0.5">
+                {{ printData.letter_format_config?.institution_level2 || 'DINAS PENDIDIKAN DAN KEBUDAYAAN' }}
+              </p>
+              <h3 class="text-sm sm:text-base font-black uppercase tracking-wide text-slate-900 mt-0.5">
+                {{ printData.school?.name || 'SMA NEGERI CONTOH' }}
+              </h3>
+              <p class="text-xs font-sans text-slate-700 mt-1 leading-normal">
+                {{ printData.school?.address || 'Jalan Pendidikan No. 1' }} • NPSN: {{ printData.school?.npsn || '-' }}
+              </p>
+              <p class="text-[11px] font-sans text-slate-600">
+                Telp: {{ printData.school?.phone || '-' }} • Email: {{ printData.school?.email || '-' }}
+              </p>
+
+              <!-- Dual Border Hairlines standard in Indonesian government documents -->
+              <div class="mt-3 border-t-2 border-black"></div>
+              <div class="mt-0.5 border-t border-black"></div>
+            </div>
+          </div>
+
+          <!-- Document Title & Reference Number -->
+          <div class="text-center pt-2 space-y-0.5">
+            <h3 class="text-sm sm:text-base font-black uppercase underline tracking-wide">
+              {{ printData.letter_format_config?.document_title || 'SURAT KETERANGAN DISPENSASI BELAJAR (KBM)' }}
+            </h3>
+            <p class="text-xs font-sans font-semibold text-slate-700">
+              Nomor: {{ printData.dispensation?.reference_number }}
             </p>
           </div>
 
-          <!-- Judul Surat -->
-          <div class="text-center pt-2">
-            <h3 class="text-sm font-bold uppercase underline">SURAT KETERANGAN DISPENSASI BELAJAR (KBM)</h3>
-            <p class="text-xs font-sans font-semibold mt-0.5">Nomor: {{ printData.dispensation?.reference_number }}</p>
-          </div>
-
-          <!-- Isi Surat -->
-          <div class="text-xs font-sans text-slate-800 leading-relaxed space-y-3">
+          <!-- Document Body -->
+          <div class="text-xs font-sans text-slate-900 leading-relaxed space-y-3 pt-2">
             <p>
-              Yang bertanda tangan di bawah ini, Kepala Sekolah / Bagian Kesiswaan menerangkan bahwa siswa-siswi tersebut di bawah ini:
+              Yang bertanda tangan di bawah ini, Kepala Sekolah / Bidang Kesiswaan {{ printData.school?.name }}, menerangkan bahwa siswa-siswi tersebut di bawah ini:
             </p>
 
-            <table class="w-full text-xs border border-slate-400 border-collapse">
-              <thead class="bg-slate-100 font-bold">
+            <!-- Student Table -->
+            <table class="w-full text-xs border border-slate-400 border-collapse my-2">
+              <thead class="bg-slate-100 font-bold text-slate-800">
                 <tr>
-                  <th class="border border-slate-400 px-2 py-1 text-center w-8">No</th>
-                  <th class="border border-slate-400 px-2 py-1">Nama Siswa</th>
-                  <th class="border border-slate-400 px-2 py-1">NIS</th>
-                  <th class="border border-slate-400 px-2 py-1">Kelas</th>
+                  <th class="border border-slate-400 px-2.5 py-1.5 text-center w-8">No</th>
+                  <th class="border border-slate-400 px-3 py-1.5 text-left">Nama Siswa</th>
+                  <th class="border border-slate-400 px-3 py-1.5 text-center">NIS</th>
+                  <th class="border border-slate-400 px-3 py-1.5 text-center">Kelas</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(std, idx) in printData.students" :key="std.id">
-                  <td class="border border-slate-400 px-2 py-1 text-center">{{ Number(idx) + 1 }}</td>
-                  <td class="border border-slate-400 px-2 py-1 font-semibold">{{ std.full_name }}</td>
-                  <td class="border border-slate-400 px-2 py-1">{{ std.nis || '-' }}</td>
-                  <td class="border border-slate-400 px-2 py-1">{{ std.class_name || '-' }}</td>
+                  <td class="border border-slate-400 px-2.5 py-1.5 text-center">{{ Number(idx) + 1 }}</td>
+                  <td class="border border-slate-400 px-3 py-1.5 font-bold">{{ std.full_name }}</td>
+                  <td class="border border-slate-400 px-3 py-1.5 text-center font-mono">{{ std.nis || '-' }}</td>
+                  <td class="border border-slate-400 px-3 py-1.5 text-center">{{ std.class_name || '-' }}</td>
                 </tr>
               </tbody>
             </table>
 
             <p>
-              Diberikan izin dispensasi untuk tidak mengikuti Kegiatan Belajar Mengajar (KBM) di kelas sehubungan dengan:
+              Diberikan izin dispensasi untuk tidak mengikuti Kegiatan Belajar Mengajar (KBM) di kelas sehubungan dengan keikutsertaan pada kegiatan:
             </p>
 
-            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-1">
-              <p><span class="font-bold">Kegiatan:</span> {{ printData.dispensation?.competition_name }}</p>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-300 text-xs space-y-1 my-2">
+              <p><span class="font-bold">Nama Kegiatan:</span> {{ printData.dispensation?.competition_name }}</p>
               <p><span class="font-bold">Keperluan:</span> {{ printData.dispensation?.purpose }}</p>
               <p><span class="font-bold">Waktu Pelaksanaan:</span> {{ printData.dispensation?.start_date }} s.d. {{ printData.dispensation?.end_date }}</p>
-              <p v-if="printData.dispensation?.supervisor_name"><span class="font-bold">Guru Pembimbing:</span> {{ printData.dispensation?.supervisor_name }}</p>
+              <p><span class="font-bold">Guru Pembina:</span> {{ printData.dispensation?.supervisor_name || 'Pembina Lomba Sekolah' }}</p>
+
+              <!-- Dynamic custom fields on printable letter -->
+              <template v-if="printData.form_schema && printData.form_schema.length > 0">
+                <template v-for="cf in printData.form_schema" :key="cf.id">
+                  <p v-if="printData.custom_fields_data && printData.custom_fields_data[cf.name] !== undefined && printData.custom_fields_data[cf.name] !== ''">
+                    <span class="font-bold">{{ cf.label }}:</span>
+                    {{ typeof printData.custom_fields_data[cf.name] === 'boolean' ? (printData.custom_fields_data[cf.name] ? 'Ya / Terpenuhi' : 'Tidak') : printData.custom_fields_data[cf.name] }}
+                  </p>
+                </template>
+              </template>
             </div>
 
-            <p>
-              Demikian surat dispensasi ini dibuat agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya. Siswa tetap berkewajiban menyelesaikan tugas-tugas KBM yang tertinggal.
+            <p class="italic text-slate-700">
+              {{ printData.letter_format_config?.closing_text || 'Demikian surat dispensasi ini dibuat agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya. Siswa tetap berkewajiban menyelesaikan materi pelajaran serta tugas-tugas yang tertinggal.' }}
             </p>
           </div>
 
-          <!-- Tanda Tangan & QR Verifikasi -->
-          <div class="pt-4 flex items-end justify-between text-xs font-sans">
-            <!-- QR Code Box -->
-            <div class="text-center p-2 border border-slate-300 rounded-lg">
+          <!-- Bottom: QR Code Verification Box & Dual Signatures Block -->
+          <div class="pt-6 grid grid-cols-12 gap-4 items-end text-xs font-sans">
+            <!-- Left: Official QR Verification (3 Cols) -->
+            <div class="col-span-3 text-center p-2.5 border border-slate-300 rounded-lg bg-slate-50/50">
               <img
                 v-if="printData.qr_code_data_uri"
                 :src="printData.qr_code_data_uri"
-                alt="QR Verifikasi Guru"
-                class="w-24 h-24 mx-auto"
+                alt="QR Code Verifikasi"
+                class="w-20 h-20 mx-auto"
               />
-              <p class="text-[9px] text-slate-500 font-mono mt-1">Scan QR untuk Verifikasi Guru</p>
+              <p class="text-[8.5px] text-slate-600 font-medium leading-tight mt-1">
+                Pindai QR untuk verifikasi keabsahan izin
+              </p>
             </div>
 
-            <!-- Signature Box -->
-            <div class="text-center space-y-12">
-              <p>Diterbitkan pada: {{ printData.printed_at }}<br /><span class="font-bold">Kepala Sekolah / Bidang Kesiswaan</span></p>
-              <p class="font-bold underline">{{ printData.dispensation?.approved_by?.name || 'Admin Sekolah' }}</p>
+            <!-- Right: 2 Signatures Columns (9 Cols) -->
+            <div class="col-span-9 grid grid-cols-2 gap-4 text-center">
+              <!-- Tanda Tangan 1: Guru Pembina Lomba (Terisi Otomatis) -->
+              <div class="space-y-12">
+                <div class="text-[11px] text-slate-700 leading-tight">
+                  Ditetapkan di: {{ printData.school?.city || 'Sekolah' }}<br />
+                  Pada tanggal: {{ printData.printed_at }}<br />
+                  <span class="font-bold text-slate-900 mt-1 block">Mengetahui,<br>Guru Pembina Lomba</span>
+                </div>
+                <div>
+                  <p class="font-bold underline text-xs text-brand-navy">
+                    {{ printData.dispensation?.supervisor_name || 'Guru Pembina Lomba' }}
+                  </p>
+                  <p class="text-[10px] text-slate-500">NIP. - / Pembina Prestasi</p>
+                </div>
+              </div>
+
+              <!-- Tanda Tangan 2: Guru Mata Pelajaran / Guru Piket (Dikosongkan) -->
+              <div class="space-y-12">
+                <div class="text-[11px] text-slate-700 leading-tight">
+                  <br /><br />
+                  <span class="font-bold text-slate-900 mt-1 block">Menyetujui / Memaklumi,<br>Guru Mata Pelajaran / Piket</span>
+                </div>
+                <div>
+                  <p class="font-bold text-xs text-slate-600">
+                    ( .................................................. )
+                  </p>
+                  <p class="text-[9.5px] text-slate-400 italic mt-0.5">*Ditandatangani saat jam KBM di kelas</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            @click="showPrintModal = false"
-            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
-          >
-            Tutup
-          </button>
-          <button
-            type="button"
-            @click="handlePrintAction"
-            class="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2 shadow-xs cursor-pointer"
-          >
-            <i class="fa-solid fa-print"></i>
-            <span>Cetak / Simpan PDF</span>
-          </button>
+        <!-- Action Buttons: Unduh DOCX, Unduh PDF, dan Cetak Langsung -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
+          <div class="text-xs text-slate-500 flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+            <span>Dokumen resmi siap dicetak atau diunduh</span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              @click="showPrintModal = false"
+              class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+            >
+              Tutup
+            </button>
+
+            <!-- Unduh DOCX -->
+            <button
+              type="button"
+              @click="downloadDocx(printData.dispensation?.id, printData.dispensation?.reference_number)"
+              :disabled="downloadingDocx"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              <i v-if="downloadingDocx" class="fa-solid fa-spinner fa-spin"></i>
+              <i v-else class="fa-solid fa-file-word"></i>
+              <span>Unduh DOCX (.docx)</span>
+            </button>
+
+            <!-- Unduh PDF -->
+            <button
+              type="button"
+              @click="downloadPdf(printData.dispensation?.id, printData.dispensation?.reference_number)"
+              :disabled="downloadingPdf"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              <i v-if="downloadingPdf" class="fa-solid fa-spinner fa-spin"></i>
+              <i v-else class="fa-solid fa-file-pdf"></i>
+              <span>Unduh PDF (.pdf)</span>
+            </button>
+
+            <!-- Cetak Window -->
+            <button
+              type="button"
+              @click="handlePrintAction"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-navy hover:bg-[#00164a] text-white flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <i class="fa-solid fa-print text-brand-gold"></i>
+              <span>Cetak Pratinjau</span>
+            </button>
+          </div>
         </div>
       </div>
     </Modal>

@@ -26,6 +26,7 @@ use Illuminate\Support\Str;
     'is_all_day',
     'supervisor_name',
     'attachment_path',
+    'custom_fields_data',
     'status',
     'requested_by',
     'approved_by',
@@ -44,6 +45,7 @@ class KbmDispensation extends Model
             'end_date' => 'date',
             'is_all_day' => 'boolean',
             'approved_at' => 'datetime',
+            'custom_fields_data' => 'array',
         ];
     }
 

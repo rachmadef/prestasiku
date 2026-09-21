@@ -78,6 +78,7 @@ class CompetitionManagementController extends Controller
                 'target_level' => $validated['target_level'],
                 'description' => $validated['description'],
                 'official_website_url' => $validated['official_website_url'] ?? null,
+                'registration_url' => $validated['registration_url'] ?? null,
                 'guide_book_url' => $validated['guide_book_url'] ?? null,
                 'poster_url' => $validated['poster_url'] ?? null,
                 'participation_type' => $validated['participation_type'],

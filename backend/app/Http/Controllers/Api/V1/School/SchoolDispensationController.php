@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\School;
 use App\Http\Controllers\Controller;
 use App\Models\KbmDispensation;
 use App\Models\Student;
+use App\Services\DispensationDocumentService;
 use App\Services\QrCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,8 +15,10 @@ use Illuminate\Validation\Rule;
 
 class SchoolDispensationController extends Controller
 {
-    public function __construct(protected QrCodeService $qrCodeService)
-    {
+    public function __construct(
+        protected QrCodeService $qrCodeService,
+        protected DispensationDocumentService $documentService
+    ) {
     }
 
     /**
@@ -71,6 +74,73 @@ class SchoolDispensationController extends Controller
     }
 
     /**
+     * Get the school's dispensation custom form schema.
+     */
+    public function getFormSchema(Request $request): JsonResponse
+    {
+        $school = $request->user()->school;
+        if (! $school) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda tidak terikat dengan instansi sekolah.',
+            ], 403);
+        }
+
+        $schema = $school->dispensation_form_schema ?? [];
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'school_id' => $school->id,
+                'school_name' => $school->name,
+                'schema' => $schema,
+            ],
+        ]);
+    }
+
+    /**
+     * Update the school's dispensation custom form schema.
+     */
+    public function updateFormSchema(Request $request): JsonResponse
+    {
+        $school = $request->user()->school;
+        if (! $school) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda tidak terikat dengan instansi sekolah.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'schema' => 'nullable|array',
+            'schema.*.id' => 'required|string',
+            'schema.*.name' => 'required|string|regex:/^[a-zA-Z0-9_]+$/',
+            'schema.*.label' => 'required|string|max:255',
+            'schema.*.type' => 'required|in:text,textarea,select,number,checkbox,date',
+            'schema.*.placeholder' => 'nullable|string|max:255',
+            'schema.*.description' => 'nullable|string|max:500',
+            'schema.*.options' => 'nullable|array',
+            'schema.*.options.*' => 'nullable|string',
+            'schema.*.is_required' => 'boolean',
+        ]);
+
+        $schemaData = $validated['schema'] ?? [];
+
+        $school->update([
+            'dispensation_form_schema' => $schemaData,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pengaturan kolom formulir dispensasi sekolah berhasil disimpan.',
+            'data' => [
+                'school_id' => $school->id,
+                'schema' => $schemaData,
+            ],
+        ]);
+    }
+
+    /**
      * Direct creation of KBM dispensation by school admin/kesiswaan.
      */
     public function store(Request $request): JsonResponse
@@ -102,11 +172,19 @@ class SchoolDispensationController extends Controller
             ],
             'notes' => 'nullable|string|max:255',
             'reference_number' => 'nullable|string|max:100',
+            'custom_fields_data' => 'nullable',
         ]);
 
         $attachmentPath = null;
         if ($request->hasFile('attachment_file')) {
             $attachmentPath = $request->file('attachment_file')->store('dispensations', 'local');
+        }
+
+        // Process custom_fields_data (support both JSON string in multipart/form-data and direct array)
+        $customFieldsData = null;
+        if ($request->has('custom_fields_data')) {
+            $rawCustom = $request->input('custom_fields_data');
+            $customFieldsData = is_string($rawCustom) ? json_decode($rawCustom, true) : $rawCustom;
         }
 
         DB::beginTransaction();
@@ -125,6 +203,7 @@ class SchoolDispensationController extends Controller
                 'is_all_day' => $request->boolean('is_all_day', true),
                 'supervisor_name' => $validated['supervisor_name'] ?? null,
                 'attachment_path' => $attachmentPath,
+                'custom_fields_data' => $customFieldsData,
                 'status' => 'approved', // Langsung approved jika dibuat oleh admin sekolah
                 'requested_by' => $request->user()->id,
                 'approved_by' => $request->user()->id,
@@ -255,6 +334,11 @@ class SchoolDispensationController extends Controller
         $verificationUrl = $this->qrCodeService->getDispensationVerificationUrl($dispensation->verification_token);
         $qrDataUri = $this->qrCodeService->generateDispensationDataUri($dispensation->verification_token, 180);
 
+        $letterheadImageUrl = null;
+        if (! empty($school->letterhead_image_path)) {
+            $letterheadImageUrl = Storage::disk('public')->url($school->letterhead_image_path);
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -264,7 +348,215 @@ class SchoolDispensationController extends Controller
                 'verification_url' => $verificationUrl,
                 'qr_code_data_uri' => $qrDataUri,
                 'printed_at' => now()->translatedFormat('d F Y'),
+                'form_schema' => $dispensation->school->dispensation_form_schema ?? [],
+                'custom_fields_data' => $dispensation->custom_fields_data ?? [],
+                'letterhead_type' => $school->letterhead_type ?? 'text',
+                'letterhead_image_url' => $letterheadImageUrl,
+                'letter_format_config' => $school->letter_format_config ?? [],
+                // 2 Kolom Tanda Tangan:
+                // Tanda Tangan 1: Guru Pembina Lomba (Otomatis terisi dari supervisor_name)
+                // Tanda Tangan 2: Guru Mapel / Guru Piket (Dikosongkan untuk tanda tangan basah di kelas)
+                'signatures' => [
+                    'pembina' => [
+                        'title' => 'Guru Pembina Lomba',
+                        'name' => $dispensation->supervisor_name ?: 'Guru Pembina Lomba',
+                        'nip' => 'NIP. - / Pembina Prestasi Sekolah',
+                    ],
+                    'mapel' => [
+                        'title' => 'Guru Mata Pelajaran / Guru Piket',
+                        'name' => '( .................................................. )',
+                        'nip' => 'NIP. ..............................................',
+                        'note' => '* Ditandatangani saat jam KBM di kelas',
+                    ],
+                ],
             ],
         ]);
+    }
+
+    /**
+     * Get the school's letterhead and dispensation letter template configuration.
+     */
+    public function getLetterTemplate(Request $request): JsonResponse
+    {
+        $school = $request->user()->school;
+        if (! $school) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda tidak terikat dengan instansi sekolah.',
+            ], 403);
+        }
+
+        $letterheadImageUrl = null;
+        if (! empty($school->letterhead_image_path)) {
+            $letterheadImageUrl = Storage::disk('public')->url($school->letterhead_image_path);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'school_id' => $school->id,
+                'school_name' => $school->name,
+                'letterhead_type' => $school->letterhead_type ?? 'text',
+                'letterhead_image_url' => $letterheadImageUrl,
+                'letter_format_config' => $school->letter_format_config ?? [
+                    'institution_level1' => 'PEMERINTAH DAERAH PROVINSI',
+                    'institution_level2' => 'DINAS PENDIDIKAN DAN KEBUDAYAAN',
+                    'document_title' => 'SURAT KETERANGAN DISPENSASI BELAJAR (KBM)',
+                    'reference_number_prefix' => '421.3/DISP-KBM',
+                    'closing_text' => 'Demikian surat dispensasi ini dibuat agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya. Siswa tetap berkewajiban menyelesaikan materi pelajaran serta tugas-tugas yang tertinggal.',
+                ],
+                'has_custom_docx' => ! empty($school->dispensation_docx_template_path),
+                'docx_template_name' => $school->dispensation_docx_template_path ? basename($school->dispensation_docx_template_path) : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Upload letterhead image, configure format, or upload custom docx template.
+     */
+    public function updateLetterTemplate(Request $request): JsonResponse
+    {
+        $school = $request->user()->school;
+        if (! $school) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda tidak terikat dengan instansi sekolah.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'letterhead_type' => 'required|in:image,text',
+            'letterhead_image' => 'nullable|file|mimes:png,jpg,jpeg,webp|max:5120',
+            'remove_letterhead_image' => 'nullable|boolean',
+            'docx_template' => 'nullable|file|mimes:docx|max:10240',
+            'remove_docx_template' => 'nullable|boolean',
+            'institution_level1' => 'nullable|string|max:255',
+            'institution_level2' => 'nullable|string|max:255',
+            'document_title' => 'nullable|string|max:255',
+            'reference_number_prefix' => 'nullable|string|max:100',
+            'closing_text' => 'nullable|string|max:1000',
+        ]);
+
+        $updates = [
+            'letterhead_type' => $validated['letterhead_type'],
+        ];
+
+        // Handle letterhead image
+        if ($request->boolean('remove_letterhead_image')) {
+            if ($school->letterhead_image_path) {
+                Storage::disk('public')->delete($school->letterhead_image_path);
+            }
+            $updates['letterhead_image_path'] = null;
+        } elseif ($request->hasFile('letterhead_image')) {
+            if ($school->letterhead_image_path) {
+                Storage::disk('public')->delete($school->letterhead_image_path);
+            }
+            $path = $request->file('letterhead_image')->store("schools/{$school->id}/letterhead", 'public');
+            $updates['letterhead_image_path'] = $path;
+            $updates['letterhead_type'] = 'image';
+        }
+
+        // Handle custom DOCX template
+        if ($request->boolean('remove_docx_template')) {
+            if ($school->dispensation_docx_template_path) {
+                Storage::disk('public')->delete($school->dispensation_docx_template_path);
+            }
+            $updates['dispensation_docx_template_path'] = null;
+        } elseif ($request->hasFile('docx_template')) {
+            if ($school->dispensation_docx_template_path) {
+                Storage::disk('public')->delete($school->dispensation_docx_template_path);
+            }
+            $path = $request->file('docx_template')->store("schools/{$school->id}/templates", 'public');
+            $updates['dispensation_docx_template_path'] = $path;
+        }
+
+        // Handle letter format configuration
+        $config = $school->letter_format_config ?? [];
+        $config['institution_level1'] = $validated['institution_level1'] ?? ($config['institution_level1'] ?? 'PEMERINTAH DAERAH PROVINSI');
+        $config['institution_level2'] = $validated['institution_level2'] ?? ($config['institution_level2'] ?? 'DINAS PENDIDIKAN DAN KEBUDAYAAN');
+        $config['document_title'] = $validated['document_title'] ?? ($config['document_title'] ?? 'SURAT KETERANGAN DISPENSASI BELAJAR (KBM)');
+        $config['reference_number_prefix'] = $validated['reference_number_prefix'] ?? ($config['reference_number_prefix'] ?? '421.3/DISP-KBM');
+        $config['closing_text'] = $validated['closing_text'] ?? ($config['closing_text'] ?? 'Demikian surat dispensasi ini dibuat agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya.');
+        $updates['letter_format_config'] = $config;
+
+        $school->update($updates);
+
+        $letterheadImageUrl = $school->letterhead_image_path ? Storage::disk('public')->url($school->letterhead_image_path) : null;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Format surat dan kop sekolah berhasil diperbarui.',
+            'data' => [
+                'letterhead_type' => $school->letterhead_type,
+                'letterhead_image_url' => $letterheadImageUrl,
+                'letter_format_config' => $school->letter_format_config,
+                'has_custom_docx' => ! empty($school->dispensation_docx_template_path),
+                'docx_template_name' => $school->dispensation_docx_template_path ? basename($school->dispensation_docx_template_path) : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Download dispensation as Microsoft Word (.docx) file.
+     */
+    public function downloadDocx(Request $request, int $id)
+    {
+        $school = $request->user()->school;
+        $dispensation = KbmDispensation::where('school_id', $school->id)
+            ->with(['school', 'students', 'approvedBy'])
+            ->findOrFail($id);
+
+        if ($dispensation->status !== 'approved') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Surat dispensasi belum disetujui, belum dapat diunduh.',
+            ], 422);
+        }
+
+        try {
+            $filePath = $this->documentService->generateDocx($dispensation);
+            $safeRef = preg_replace('/[^a-zA-Z0-9_-]/', '_', $dispensation->reference_number ?: 'DISP');
+            $downloadName = "Surat_Dispensasi_{$safeRef}.docx";
+
+            return response()->download($filePath, $downloadName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ])->deleteFileAfterSend(true);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghasilkan dokumen DOCX: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Download dispensation as PDF file.
+     */
+    public function downloadPdf(Request $request, int $id)
+    {
+        $school = $request->user()->school;
+        $dispensation = KbmDispensation::where('school_id', $school->id)
+            ->with(['school', 'students', 'approvedBy'])
+            ->findOrFail($id);
+
+        if ($dispensation->status !== 'approved') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Surat dispensasi belum disetujui, belum dapat diunduh.',
+            ], 422);
+        }
+
+        try {
+            $pdf = $this->documentService->generatePdf($dispensation);
+            $safeRef = preg_replace('/[^a-zA-Z0-9_-]/', '_', $dispensation->reference_number ?: 'DISP');
+            $downloadName = "Surat_Dispensasi_{$safeRef}.pdf";
+
+            return $pdf->download($downloadName);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghasilkan dokumen PDF: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }

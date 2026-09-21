@@ -73,6 +73,8 @@ class PublicDispensationVerificationController extends Controller
                     'class_name' => $s->class_name,
                     'nis' => $s->nis,
                 ]),
+                'custom_fields_data' => $dispensation->custom_fields_data ?? [],
+                'form_schema' => $dispensation->school->dispensation_form_schema ?? [],
             ],
         ]);
     }

@@ -24,29 +24,55 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
     // -------------------------------------------------------------
-    // Public Endpoints
+    // Public Endpoints (Throttled for brute-force & scraping protection)
     // -------------------------------------------------------------
-    Route::post('/auth/login', [AuthController::class, 'login'])->name('auth.login');
-    Route::post('/school-registration', [SchoolRegistrationController::class, 'register'])->name('school-registration.register');
+    Route::post('/auth/login', [AuthController::class, 'login'])
+        ->middleware('throttle:10,1')
+        ->name('auth.login');
+
+    Route::post('/school-registration', [SchoolRegistrationController::class, 'register'])
+        ->middleware('throttle:5,1')
+        ->name('school-registration.register');
+
+    Route::get('/districts/{cityId}', function ($cityId) {
+        return \Illuminate\Support\Facades\Cache::remember("districts_{$cityId}", 86400, function () use ($cityId) {
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            ])->timeout(8)->get("https://emsifa.github.io/api-wilayah-indonesia/api/districts/{$cityId}.json");
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+            return [];
+        });
+    })->name('public.districts');
 
     // Public Competition Directory & Categories
+    Route::get('/curation-groups', [CompetitionCatalogController::class, 'curationGroups'])->name('competitions.curation_groups');
     Route::get('/competitions', [CompetitionCatalogController::class, 'index'])->name('competitions.index');
     Route::get('/competitions/{slug}', [CompetitionCatalogController::class, 'show'])->name('competitions.show');
     Route::get('/categories', [CompetitionCatalogController::class, 'categories'])->name('categories.index');
 
-    // Public QR Verification (Privacy-by-default)
-    Route::get('/verify/{public_id}', [PublicVerificationController::class, 'verify'])->name('verify.show');
-    Route::get('/verify/{public_id}/qr', [PublicVerificationController::class, 'qr'])->name('verify.qr');
+    // Public QR Verification (Privacy-by-default & Anti-scraping Throttled)
+    Route::get('/verify/{public_id}', [PublicVerificationController::class, 'verify'])
+        ->middleware('throttle:60,1')
+        ->name('verify.show');
+    Route::get('/verify/{public_id}/qr', [PublicVerificationController::class, 'qr'])
+        ->middleware('throttle:60,1')
+        ->name('verify.qr');
 
-    // Public QR Verification for KBM Dispensation
-    Route::get('/dispensations/verify/{token}', [PublicDispensationVerificationController::class, 'verify'])->name('dispensations.verify');
+    // Public QR Verification for KBM Dispensation (Anti-enumeration Throttled)
+    Route::get('/dispensations/verify/{token}', [PublicDispensationVerificationController::class, 'verify'])
+        ->middleware('throttle:60,1')
+        ->name('dispensations.verify');
 
     // -------------------------------------------------------------
-    // Protected Endpoints (Sanctum + Active User + Password Changed Check)
+    // Protected Endpoints (Sanctum + Active User + Password Changed + Throttled)
     // -------------------------------------------------------------
-    Route::middleware(['auth:sanctum', 'user.active', 'password.changed'])->group(function () {
+    Route::middleware(['auth:sanctum', 'user.active', 'password.changed', 'throttle:120,1'])->group(function () {
         // Auth profile & credential management
         Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
+        Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->name('auth.profile.update');
         Route::post('/auth/change-password', [AuthController::class, 'changePassword'])->name('auth.change-password');
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 
@@ -79,10 +105,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             // Portfolio: Complete competition history (Menang & Kalah/Partisipan)
             Route::get('/portfolio', [StudentRegistrationController::class, 'portfolio'])->name('portfolio');
 
-            // Student KBM Dispensations
+            // Student KBM Dispensations & Form Schema
+            Route::get('/dispensations/form-schema', [StudentDispensationController::class, 'getFormSchema'])->name('dispensations.form-schema');
             Route::get('/dispensations', [StudentDispensationController::class, 'index'])->name('dispensations.index');
             Route::post('/dispensations', [StudentDispensationController::class, 'store'])->name('dispensations.store');
             Route::get('/dispensations/{id}', [StudentDispensationController::class, 'show'])->name('dispensations.show');
+            Route::get('/dispensations/{id}/download-docx', [StudentDispensationController::class, 'downloadDocx'])->name('dispensations.download-docx');
+            Route::get('/dispensations/{id}/download-pdf', [StudentDispensationController::class, 'downloadPdf'])->name('dispensations.download-pdf');
 
             // Student Achievements
             Route::get('/achievements', [StudentAchievementController::class, 'index'])->name('achievements.index');
@@ -153,12 +182,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/registrations/{id}/result', [SchoolRegistrationManagementController::class, 'recordResult'])->name('registrations.result');
             Route::get('/registrations/{id}/certificate', [SchoolRegistrationManagementController::class, 'downloadCertificate'])->name('registrations.certificate');
 
-            // KBM Dispensations Management
+            // KBM Dispensations Management, Form Schema, Kop Surat & Exports
+            Route::get('/dispensations/form-schema', [SchoolDispensationController::class, 'getFormSchema'])->name('dispensations.form-schema.get');
+            Route::put('/dispensations/form-schema', [SchoolDispensationController::class, 'updateFormSchema'])->name('dispensations.form-schema.update');
+            Route::get('/dispensations/letter-template', [SchoolDispensationController::class, 'getLetterTemplate'])->name('dispensations.letter-template.get');
+            Route::post('/dispensations/letter-template', [SchoolDispensationController::class, 'updateLetterTemplate'])->name('dispensations.letter-template.update');
             Route::get('/dispensations', [SchoolDispensationController::class, 'index'])->name('dispensations.index');
             Route::post('/dispensations', [SchoolDispensationController::class, 'store'])->name('dispensations.store');
             Route::get('/dispensations/{id}', [SchoolDispensationController::class, 'show'])->name('dispensations.show');
             Route::post('/dispensations/{id}/review', [SchoolDispensationController::class, 'review'])->name('dispensations.review');
             Route::get('/dispensations/{id}/print-letter', [SchoolDispensationController::class, 'printLetter'])->name('dispensations.print-letter');
+            Route::get('/dispensations/{id}/download-docx', [SchoolDispensationController::class, 'downloadDocx'])->name('dispensations.download-docx');
+            Route::get('/dispensations/{id}/download-pdf', [SchoolDispensationController::class, 'downloadPdf'])->name('dispensations.download-pdf');
 
             // Achievements Management & Verification
             Route::get('/achievements', [SchoolAchievementController::class, 'index'])->name('achievements.index');

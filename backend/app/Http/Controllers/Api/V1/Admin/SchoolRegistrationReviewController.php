@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ReviewSchoolRegistrationRequest;
+use App\Mail\SchoolAdminAccountCreatedMail;
 use App\Models\School;
 use App\Models\SchoolRegistration;
 use App\Models\User;
@@ -11,6 +12,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class SchoolRegistrationReviewController extends Controller
 {
@@ -98,7 +101,7 @@ class SchoolRegistrationReviewController extends Controller
             ], 422);
         }
 
-        $temporaryPassword = $request->input('admin_password') ?: 'Admin#' . $registration->npsn;
+        $temporaryPassword = $request->input('admin_password') ?: 'password123';
         $adminUser = null;
         $school = null;
 
@@ -158,6 +161,18 @@ class SchoolRegistrationReviewController extends Controller
                 'success' => false,
                 'message' => 'Gagal menyetujui pendaftaran sekolah: ' . $e->getMessage(),
             ], 500);
+        }
+
+        // 5. Send automated account credential email to PIC
+        try {
+            Mail::to($adminEmail)->send(new SchoolAdminAccountCreatedMail(
+                school: $school,
+                registration: $registration,
+                adminUser: $adminUser,
+                temporaryPassword: $temporaryPassword
+            ));
+        } catch (\Throwable $mailErr) {
+            Log::warning('Gagal mengirim email kredensial akun sekolah ke PIC: ' . $mailErr->getMessage());
         }
 
         return response()->json([

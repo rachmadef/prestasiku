@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\UpdateProfileRequest;
 use App\Models\LoginEvent;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -21,6 +24,20 @@ class AuthController extends Controller
     {
         $identifier = trim($request->input('identifier'));
         $password = $request->input('password');
+
+        // Brute-force protection: max 5 attempts per minute per IP + identifier
+        $throttleKey = 'login:' . Str::transliterate(Str::lower($identifier) . '|' . $request->ip());
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            $this->logLoginEvent(null, $identifier, $request, 'failed', 'Too many login attempts (Rate limited)');
+
+            return response()->json([
+                'success' => false,
+                'message' => "Terlalu banyak percobaan login gagal. Akun dikunci sementara demi keamanan. Silakan coba lagi dalam {$seconds} detik.",
+                'retry_after' => $seconds,
+            ], 429)->header('Retry-After', (string) $seconds);
+        }
 
         // 1. Search by email or username
         $user = User::with(['roles', 'school', 'student'])
@@ -44,6 +61,7 @@ class AuthController extends Controller
 
         // 3. Verify user existence & password
         if (! $user || ! Hash::check($password, $user->password)) {
+            RateLimiter::hit($throttleKey, 60);
             $this->logLoginEvent($user?->id, $identifier, $request, 'failed', 'Invalid credentials');
 
             return response()->json([
@@ -51,6 +69,9 @@ class AuthController extends Controller
                 'message' => 'Email, username, NIS, atau password yang Anda masukkan salah.',
             ], 401);
         }
+
+        // Clear rate limiter on successful authentication
+        RateLimiter::clear($throttleKey);
 
         // 4. Check user status
         if ($user->status !== 'active') {
@@ -165,6 +186,34 @@ class AuthController extends Controller
     }
 
     /**
+     * Update current authenticated user profile.
+     */
+    public function updateProfile(UpdateProfileRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $validated = $request->validated();
+
+        $user->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profil akun berhasil diperbarui.',
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'username' => $user->username,
+                'phone' => $user->phone,
+                'roles' => $user->getRoleNames(),
+            ],
+        ]);
+    }
+
+    /**
      * Mandatory / voluntary change password.
      */
     public function changePassword(ChangePasswordRequest $request): JsonResponse
@@ -176,6 +225,12 @@ class AuthController extends Controller
             'must_change_password' => false,
             'password_changed_at' => now(),
         ])->save();
+
+        // Security: Invalidate all other active sessions/tokens across other devices
+        $currentTokenId = $user->currentAccessToken()?->id;
+        if ($currentTokenId) {
+            $user->tokens()->where('id', '!=', $currentTokenId)->delete();
+        }
 
         return response()->json([
             'success' => true,
