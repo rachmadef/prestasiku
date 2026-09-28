@@ -18,6 +18,7 @@ const selectedCategory = ref((route.query.category as string) || '')
 const selectedLevel = ref((route.query.level as string) || '')
 const selectedScope = ref((route.query.scope as string) || '')
 const selectedCuration = ref((route.query.curation as string) || '')
+const selectedTimeline = ref((route.query.timeline as string) || '')
 
 async function fetchCategories() {
   try {
@@ -61,6 +62,7 @@ async function fetchCompetitions() {
     if (selectedLevel.value) params.educational_level = selectedLevel.value
     if (selectedScope.value) params.scope = selectedScope.value
     if (selectedCuration.value) params.curation_type = selectedCuration.value
+    if (selectedTimeline.value) params.timeline = selectedTimeline.value
 
     const response = await api.get('/competitions', { params })
     competitions.value = extractList(response.data.data)
@@ -79,6 +81,7 @@ function handleFilter() {
       ...(selectedLevel.value ? { level: selectedLevel.value } : {}),
       ...(selectedScope.value ? { scope: selectedScope.value } : {}),
       ...(selectedCuration.value ? { curation: selectedCuration.value } : {}),
+      ...(selectedTimeline.value ? { timeline: selectedTimeline.value } : {}),
     },
   })
   fetchCompetitions()
@@ -100,6 +103,7 @@ function resetFilters() {
   selectedLevel.value = ''
   selectedScope.value = ''
   selectedCuration.value = ''
+  selectedTimeline.value = ''
   router.replace({ query: {} })
   fetchCompetitions()
   fetchCurationGroups()
@@ -320,6 +324,20 @@ watch(() => route.query.curation, (newC) => {
             />
           </div>
 
+          <!-- Filter Status Pendaftaran / Waktu Pelaksanaan Lomba -->
+          <div>
+            <select
+              v-model="selectedTimeline"
+              @change="handleFilter"
+              class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold focus:outline-hidden focus:border-brand-blue focus:bg-white transition-colors"
+            >
+              <option value="">Semua Status Pendaftaran</option>
+              <option value="open">🟢 Pendaftaran Sudah Dibuka</option>
+              <option value="not_started">⏳ Pendaftaran Belum Dibuka</option>
+              <option value="completed">🏁 Lomba Sudah Terlaksana</option>
+            </select>
+          </div>
+
           <!-- Curation Select -->
           <div>
             <select
@@ -345,19 +363,6 @@ watch(() => route.query.curation, (newC) => {
               <option v-for="cat in categories" :key="cat.id" :value="cat.id">
                 {{ cat.name }}
               </option>
-            </select>
-          </div>
-
-          <!-- Level Select -->
-          <div>
-            <select
-              v-model="selectedLevel"
-              @change="handleFilter"
-              class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-hidden focus:border-brand-blue focus:bg-white transition-colors"
-            >
-              <option value="">Semua Jenjang</option>
-              <option value="sltp">SMP / MTs</option>
-              <option value="slta">SMA / SMK / MA</option>
             </select>
           </div>
 

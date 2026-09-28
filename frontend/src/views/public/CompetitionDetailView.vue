@@ -24,6 +24,27 @@ const submittingForm = ref(false)
 const submitSuccess = ref(false)
 const submitError = ref<string | null>(null)
 
+// Gemini AI Live Audit & Verification state
+const verifyingAI = ref(false)
+const aiVerifySummary = ref<string | null>(null)
+
+async function verifyWithAI() {
+  if (!competition.value) return
+  verifyingAI.value = true
+  aiVerifySummary.value = null
+  try {
+    const res = await api.post(`/competitions/${competition.value.id}/ai-verify`)
+    if (res.data?.success) {
+      competition.value = res.data.data
+      aiVerifySummary.value = res.data.ai_summary || 'Informasi & link pendaftaran/juknis telah berhasil diverifikasi ulang oleh Gemini AI.'
+    }
+  } catch (err: any) {
+    console.error('AI verification failed:', err)
+  } finally {
+    verifyingAI.value = false
+  }
+}
+
 async function fetchCompetitionDetail() {
   loading.value = true
   error.value = null
@@ -318,6 +339,52 @@ onMounted(() => {
                   </p>
                 </div>
               </a>
+            </div>
+          </div>
+
+          <!-- Gemini AI Live Audit & Verification Card -->
+          <div class="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-7 text-white border border-slate-800 shadow-sm space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-brand-gold/20 text-brand-gold flex items-center justify-center text-lg shrink-0 border border-brand-gold/30">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                    <span>Audit & Verifikasi Real-time Gemini AI</span>
+                    <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                      Live Grounded
+                    </span>
+                  </h3>
+                  <p class="text-xs text-slate-300 mt-0.5">
+                    Memastikan link pendaftaran, juknis, dan jadwal lomba sesuai dengan info resmi terkini.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                @click="verifyWithAI"
+                :disabled="verifyingAI"
+                class="px-4 py-2.5 bg-brand-gold hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <i v-if="verifyingAI" class="fa-solid fa-spinner fa-spin"></i>
+                <i v-else class="fa-solid fa-rotate text-xs"></i>
+                <span>{{ verifyingAI ? 'Memproses Audit AI...' : 'Verifikasi Ulang via Gemini AI' }}</span>
+              </button>
+            </div>
+
+            <!-- AI Summary Alert Box -->
+            <div v-if="aiVerifySummary" class="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-200 text-xs leading-relaxed flex items-start gap-2.5">
+              <i class="fa-solid fa-circle-check text-emerald-400 text-sm mt-0.5 shrink-0"></i>
+              <div>
+                <p class="font-bold text-white mb-0.5">Hasil Audit AI Terkini:</p>
+                <p>{{ aiVerifySummary }}</p>
+              </div>
+            </div>
+            <div v-else-if="competition.verification_notes" class="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-slate-300 text-xs leading-relaxed flex items-start gap-2">
+              <i class="fa-solid fa-circle-info text-brand-gold text-xs mt-0.5 shrink-0"></i>
+              <p>{{ competition.verification_notes }}</p>
             </div>
           </div>
 

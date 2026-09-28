@@ -38,6 +38,21 @@ const verifyStatus = ref('published')
 const verifyNotes = ref('Sumber resmi panduan lomba telah divalidasi sah oleh Super Admin.')
 const submittingVerify = ref(false)
 
+const syncingAllAI = ref(false)
+
+async function handleSyncAllAI() {
+  syncingAllAI.value = true
+  try {
+    const res = await api.post('/admin/competitions/sync-all-ai')
+    toast.success(res.data?.message || 'Data seluruh lomba berhasil disinkronkan dengan Gemini AI!', 'Sinkronisasi Selesai')
+    fetchCompetitions()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal menjalankan sinkronisasi AI.', 'Gagal Sync')
+  } finally {
+    syncingAllAI.value = false
+  }
+}
+
 async function fetchCompetitions() {
   loading.value = true
   try {
@@ -108,16 +123,28 @@ onMounted(() => {
     <template #header-subtitle>Kelola alur verifikasi sumber, publikasi lomba, dan formulir dinamis.</template>
 
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p class="text-xs text-slate-500">Daftar seluruh database kompetisi dalam sistem PrestasiKu.</p>
-        <button
-          type="button"
-          @click="showCreateModal = true"
-          class="px-4 py-2 bg-brand-navy hover:bg-[#001442] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2"
-        >
-          <i class="fa-solid fa-plus text-brand-gold"></i>
-          <span>Tambah Kompetisi Baru</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="handleSyncAllAI"
+            :disabled="syncingAllAI"
+            class="px-3.5 py-2 bg-gradient-to-r from-indigo-900 to-slate-900 hover:from-slate-900 hover:to-indigo-900 text-white text-xs font-extrabold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <i v-if="syncingAllAI" class="fa-solid fa-spinner fa-spin text-brand-gold"></i>
+            <i v-else class="fa-solid fa-wand-magic-sparkles text-brand-gold"></i>
+            <span>{{ syncingAllAI ? 'Memproses Audit AI...' : 'Auto-Update Semua Lomba (AI)' }}</span>
+          </button>
+          <button
+            type="button"
+            @click="showCreateModal = true"
+            class="px-4 py-2 bg-brand-navy hover:bg-[#001442] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2"
+          >
+            <i class="fa-solid fa-plus text-brand-gold"></i>
+            <span>Tambah Kompetisi Baru</span>
+          </button>
+        </div>
       </div>
 
       <!-- Competitions Table -->

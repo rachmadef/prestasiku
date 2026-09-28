@@ -23,10 +23,14 @@ const registering = ref(false)
 const registerSuccess = ref(false)
 const registerError = ref<string | null>(null)
 
+const filterTimeline = ref('')
+
 async function fetchCompetitions() {
   loading.value = true
   try {
-    const res = await api.get('/competitions?status=published')
+    const params: Record<string, any> = { status: 'published' }
+    if (filterTimeline.value) params.timeline = filterTimeline.value
+    const res = await api.get('/competitions', { params })
     competitions.value = extractList(res.data.data)
   } catch (err) {
     console.error('Error fetching competitions:', err)
@@ -94,6 +98,24 @@ onMounted(() => {
     <template #header-subtitle>Periksa kelayakan jenjang dan umur Anda secara otomatis sebelum mendaftar kompetisi.</template>
 
     <div class="space-y-6">
+      <!-- Filter Bar -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-filter text-slate-400 text-xs"></i>
+          <span class="text-xs font-bold text-slate-700">Filter Pelaksanaan:</span>
+        </div>
+        <select
+          v-model="filterTimeline"
+          @change="fetchCompetitions"
+          class="px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold focus:outline-hidden focus:border-brand-blue transition-colors cursor-pointer"
+        >
+          <option value="">Semua Waktu Lomba</option>
+          <option value="upcoming">🚀 Lomba Akan Datang</option>
+          <option value="this_month">📅 Pelaksanaan Bulan Ini</option>
+          <option value="next_month">🗓️ Pelaksanaan Bulan Depan</option>
+        </select>
+      </div>
+
       <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div v-for="i in 3" :key="i" class="bg-white rounded-2xl p-6 border border-slate-200 animate-pulse space-y-4">
           <div class="h-4 bg-slate-200 rounded-md w-1/3"></div>

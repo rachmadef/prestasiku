@@ -42,11 +42,11 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => !!state.token && !!state.user,
-    isSuperAdmin: (state) => state.user?.roles.includes('super_admin') ?? false,
-    isSchoolAdmin: (state) => state.user?.roles.includes('school_admin') ?? false,
-    isStudent: (state) => state.user?.roles.includes('student') ?? false,
+    isSuperAdmin: (state) => state.user?.roles?.includes('super_admin') ?? false,
+    isSchoolAdmin: (state) => state.user?.roles?.includes('school_admin') ?? false,
+    isStudent: (state) => state.user?.roles?.includes('student') ?? false,
     primaryRole: (state): 'super_admin' | 'school_admin' | 'student' | null => {
-      if (!state.user) return null
+      if (!state.user || !Array.isArray(state.user.roles)) return null
       if (state.user.roles.includes('super_admin')) return 'super_admin'
       if (state.user.roles.includes('school_admin')) return 'school_admin'
       if (state.user.roles.includes('student')) return 'student'

@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\SchoolRegistrationController;
 use App\Http\Controllers\Api\V1\Student\StudentAchievementController;
 use App\Http\Controllers\Api\V1\Student\StudentDispensationController;
 use App\Http\Controllers\Api\V1\Student\StudentRegistrationController;
+use App\Http\Controllers\Api\V1\ChatbotController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // -------------------------------------------------------------
     // Public Endpoints (Throttled for brute-force & scraping protection)
     // -------------------------------------------------------------
+    Route::post('/chatbot/chat', [ChatbotController::class, 'chat'])
+        ->middleware('throttle:30,1')
+        ->name('chatbot.chat');
+
     Route::post('/auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:10,1')
         ->name('auth.login');
@@ -51,6 +56,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/curation-groups', [CompetitionCatalogController::class, 'curationGroups'])->name('competitions.curation_groups');
     Route::get('/competitions', [CompetitionCatalogController::class, 'index'])->name('competitions.index');
     Route::get('/competitions/{slug}', [CompetitionCatalogController::class, 'show'])->name('competitions.show');
+    Route::post('/competitions/{id}/ai-verify', [CompetitionCatalogController::class, 'aiVerify'])
+        ->middleware('throttle:20,1')
+        ->name('competitions.ai_verify');
     Route::get('/categories', [CompetitionCatalogController::class, 'categories'])->name('categories.index');
 
     // Public QR Verification (Privacy-by-default & Anti-scraping Throttled)
@@ -152,6 +160,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             // Competition Management, Verification Pipeline, & Dynamic Forms
             Route::get('/competitions', [CompetitionManagementController::class, 'index'])->name('competitions.index');
             Route::post('/competitions', [CompetitionManagementController::class, 'store'])->name('competitions.store');
+            Route::post('/competitions/sync-all-ai', [CompetitionManagementController::class, 'syncAllAI'])->name('competitions.sync_all_ai');
             Route::get('/competitions/{id}', [CompetitionManagementController::class, 'show'])->name('competitions.show');
             Route::post('/competitions/{id}/verify', [CompetitionManagementController::class, 'verify'])->name('competitions.verify');
             Route::post('/competitions/{id}/forms', [CompetitionManagementController::class, 'storeForm'])->name('competitions.forms.store');

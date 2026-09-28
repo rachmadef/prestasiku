@@ -23,10 +23,19 @@ class CompetitionCatalogController extends Controller
                 'eligibility:id,competition_id,allowed_educational_levels,allowed_grades,allowed_provinces,gender_restriction',
             ]);
 
-        // Timeline filter: this_month or next_month
-        if ($request->input('timeline') === 'this_month') {
+        // Timeline / Registration Status filter: open, not_started, completed, etc.
+        $timeline = $request->input('timeline', $request->input('registration_status'));
+        if ($timeline === 'open') {
+            $query->registrationOpen();
+        } elseif ($timeline === 'not_started' || $timeline === 'not_open') {
+            $query->registrationNotStarted();
+        } elseif ($timeline === 'completed' || $timeline === 'ended' || $timeline === 'past') {
+            $query->completed();
+        } elseif ($timeline === 'upcoming' || $request->boolean('upcoming') || $request->input('upcoming') === '1') {
+            $query->upcoming();
+        } elseif ($timeline === 'this_month') {
             $query->thisMonth();
-        } elseif ($request->input('timeline') === 'next_month') {
+        } elseif ($timeline === 'next_month') {
             $query->nextMonth();
         }
 
@@ -190,5 +199,17 @@ class CompetitionCatalogController extends Controller
                 'groups' => $groups,
             ],
         ]);
+    }
+
+    /**
+     * Perform live Gemini AI ground verification and link audit for a competition.
+     */
+    public function aiVerify(int $id, \App\Services\GeminiCompetitionVerifierService $verifier): JsonResponse
+    {
+        $competition = Competition::with(['organizer', 'category', 'sources'])->findOrFail($id);
+
+        $result = $verifier->verifyAndUpdate($competition);
+
+        return response()->json($result);
     }
 }

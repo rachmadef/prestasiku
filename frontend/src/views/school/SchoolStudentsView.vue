@@ -327,6 +327,25 @@ onMounted(() => {
             </div>
 
             <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tempat Lahir</label>
+              <input
+                v-model="addForm.birth_place"
+                type="text"
+                placeholder="Contoh: Jakarta"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tanggal Lahir</label>
+              <input
+                v-model="addForm.birth_date"
+                type="date"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+              />
+            </div>
+
+            <div>
               <label class="block font-semibold text-slate-700 mb-1">Nomor WhatsApp Siswa</label>
               <input
                 v-model="addForm.phone_number"

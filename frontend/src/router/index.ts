@@ -234,7 +234,7 @@ router.beforeEach((to, _from) => {
   // 4. Role checking
   const requiredRole = to.matched.find((record) => record.meta.role)?.meta.role as string | undefined
   if (requiredRole && authStore.user) {
-    const hasRole = authStore.user.roles.includes(requiredRole)
+    const hasRole = Array.isArray(authStore.user.roles) && authStore.user.roles.includes(requiredRole)
     if (!hasRole) {
       if (authStore.isSuperAdmin) return '/admin/dashboard'
       if (authStore.isSchoolAdmin) return '/school/dashboard'

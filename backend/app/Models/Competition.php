@@ -132,6 +132,46 @@ class Competition extends Model
             ->where('visibility', 'public');
     }
 
+    public function scopeUpcoming(Builder $query): Builder
+    {
+        $now = now();
+        return $query->where(function (Builder $q) use ($now) {
+            $q->where('registration_deadline', '>=', $now)
+                ->orWhere('event_start_at', '>=', $now)
+                ->orWhere('event_end_at', '>=', $now)
+                ->orWhereNull('registration_deadline');
+        });
+    }
+
+    public function scopeRegistrationOpen(Builder $query): Builder
+    {
+        $now = now();
+        return $query->where(function (Builder $q) use ($now) {
+            $q->where(function (Builder $sub) use ($now) {
+                $sub->whereNull('registration_open_at')
+                    ->orWhere('registration_open_at', '<=', $now);
+            })->where(function (Builder $sub) use ($now) {
+                $sub->whereNull('registration_deadline')
+                    ->orWhere('registration_deadline', '>=', $now);
+            });
+        });
+    }
+
+    public function scopeRegistrationNotStarted(Builder $query): Builder
+    {
+        $now = now();
+        return $query->where('registration_open_at', '>', $now);
+    }
+
+    public function scopeCompleted(Builder $query): Builder
+    {
+        $now = now();
+        return $query->where(function (Builder $q) use ($now) {
+            $q->where('event_end_at', '<', $now)
+                ->orWhere('registration_deadline', '<', $now);
+        });
+    }
+
     public function scopeThisMonth(Builder $query): Builder
     {
         $start = now()->startOfMonth();

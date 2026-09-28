@@ -28,7 +28,7 @@ class StoreStudentRequest extends FormRequest
             'grade_level' => ['required', 'integer', 'between:7,12'],
             'class_name' => ['required', 'string', 'max:50'],
             'gender' => ['required', 'in:L,P'],
-            'birth_date' => ['required', 'date'],
+            'birth_date' => ['nullable', 'date'],
             'birth_place' => ['nullable', 'string', 'max:100'],
             'phone_number' => ['nullable', 'string', 'max:25'],
             'email' => ['nullable', 'email', 'max:150', 'unique:users,email'],
@@ -44,7 +44,6 @@ class StoreStudentRequest extends FormRequest
             'grade_level.required' => 'Tingkat kelas wajib diisi (7-9 untuk SLTP, 10-12 untuk SLTA).',
             'class_name.required' => 'Nama kelas wajib diisi (misal: X IPA 1, VIII-B).',
             'gender.required' => 'Jenis kelamin wajib dipilih (L / P).',
-            'birth_date.required' => 'Tanggal lahir wajib diisi.',
         ];
     }
 }

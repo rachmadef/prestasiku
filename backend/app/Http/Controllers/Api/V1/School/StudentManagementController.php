@@ -104,7 +104,7 @@ class StudentManagementController extends Controller
                 'grade_level' => $validated['grade_level'],
                 'class_name' => $validated['class_name'],
                 'gender' => $validated['gender'],
-                'birth_date' => $validated['birth_date'],
+                'birth_date' => !empty($validated['birth_date']) ? $validated['birth_date'] : '2008-01-01',
                 'birth_place' => $validated['birth_place'] ?? null,
                 'phone_number' => $validated['phone_number'] ?? null,
                 'public_profile_enabled' => false,

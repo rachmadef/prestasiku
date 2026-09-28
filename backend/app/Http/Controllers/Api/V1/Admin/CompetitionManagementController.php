@@ -273,4 +273,26 @@ class CompetitionManagementController extends Controller
             'data' => $form->load('fields'),
         ], 201);
     }
+
+    /**
+     * Batch audit and synchronize all competitions using Gemini AI Grounding.
+     */
+    public function syncAllAI(Request $request, \App\Services\GeminiCompetitionVerifierService $verifier): JsonResponse
+    {
+        $competitions = Competition::all();
+        $updatedCount = 0;
+
+        foreach ($competitions as $c) {
+            $res = $verifier->verifyAndUpdate($c);
+            if (!empty($res['success'])) {
+                $updatedCount++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Berhasil memverifikasi dan memperbarui {$updatedCount} data kompetisi secara otomatis menggunakan Gemini AI!",
+            'updated_count' => $updatedCount,
+        ]);
+    }
 }

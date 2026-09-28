@@ -284,56 +284,58 @@ function handleLogout() {
     </aside>
 
     <!-- Mobile Drawer -->
-    <div
-      v-if="mobileSidebarOpen"
-      class="fixed inset-0 z-50 lg:hidden flex"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="fixed inset-0 bg-slate-900/60 transition-opacity backdrop-blur-xs" @click="mobileSidebarOpen = false"></div>
-      <div class="relative flex-1 flex flex-col max-w-xs w-full bg-brand-navy text-white z-10 shadow-2xl">
-        <div class="h-16 flex items-center justify-between px-5 border-b border-white/10">
-          <div class="flex items-center gap-2">
-            <img src="/img/icon-white.png" alt="PrestasiKu" class="h-8 w-auto" />
-            <img src="/img/text-white.png" alt="PrestasiKu" class="h-5 w-auto" />
+    <Transition name="mobile-sidebar">
+      <div
+        v-if="mobileSidebarOpen"
+        class="fixed inset-0 z-50 lg:hidden flex"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="sidebar-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs" @click="mobileSidebarOpen = false"></div>
+        <div class="sidebar-panel relative flex-1 flex flex-col max-w-xs w-full bg-brand-navy text-white z-10 shadow-2xl">
+          <div class="h-16 flex items-center justify-between px-5 border-b border-white/10">
+            <div class="flex items-center gap-2">
+              <img src="/img/icon-white.png" alt="PrestasiKu" class="h-8 w-auto" />
+              <img src="/img/text-white.png" alt="PrestasiKu" class="h-5 w-auto" />
+            </div>
+            <button @click="mobileSidebarOpen = false" class="text-white p-1 cursor-pointer">
+              <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
           </div>
-          <button @click="mobileSidebarOpen = false" class="text-white p-1 cursor-pointer">
-            <i class="fa-solid fa-xmark text-xl"></i>
-          </button>
-        </div>
 
-        <nav class="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
-          <div v-for="(group, gIdx) in menuGroups" :key="gIdx" class="space-y-1">
-            <p v-if="group.title" class="px-3 text-[10px] uppercase font-bold tracking-wider text-blue-200/50 mb-1">
-              {{ group.title }}
-            </p>
-            <router-link
-              v-for="item in group.items"
-              :key="item.path"
-              :to="item.path"
-              @click="mobileSidebarOpen = false"
-              :class="[
-                'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium',
-                route.path === item.path ? 'bg-white/15 text-white font-bold border-l-3 border-brand-gold' : 'text-blue-100/80'
-              ]"
+          <nav class="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+            <div v-for="(group, gIdx) in menuGroups" :key="gIdx" class="space-y-1">
+              <p v-if="group.title" class="px-3 text-[10px] uppercase font-bold tracking-wider text-blue-200/50 mb-1">
+                {{ group.title }}
+              </p>
+              <router-link
+                v-for="item in group.items"
+                :key="item.path"
+                :to="item.path"
+                @click="mobileSidebarOpen = false"
+                :class="[
+                  'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-colors',
+                  route.path === item.path ? 'bg-white/15 text-white font-bold border-l-3 border-brand-gold' : 'text-blue-100/80 hover:bg-white/10'
+                ]"
+              >
+                <i :class="[item.icon, 'text-sm w-4 text-center', route.path === item.path ? 'text-brand-gold' : 'text-blue-200/60']"></i>
+                <span>{{ item.label }}</span>
+              </router-link>
+            </div>
+          </nav>
+
+          <div class="p-4 border-t border-white/10 bg-black/20">
+            <button
+              @click="handleLogout(); mobileSidebarOpen = false"
+              class="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-rose-200 bg-rose-950/40 hover:bg-rose-900/60 rounded-xl border border-rose-800/30 transition-colors cursor-pointer"
             >
-              <i :class="[item.icon, 'text-sm w-4 text-center', route.path === item.path ? 'text-brand-gold' : 'text-blue-200/60']"></i>
-              <span>{{ item.label }}</span>
-            </router-link>
+              <i class="fa-solid fa-arrow-right-from-bracket"></i>
+              Keluar Portal
+            </button>
           </div>
-        </nav>
-
-        <div class="p-4 border-t border-white/10 bg-black/20">
-          <button
-            @click="handleLogout(); mobileSidebarOpen = false"
-            class="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-rose-200 bg-rose-950/40 rounded-xl border border-rose-800/30"
-          >
-            <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            Keluar Portal
-          </button>
         </div>
       </div>
-    </div>
+    </Transition>
 
     <!-- Main Workspace Area -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
@@ -413,3 +415,36 @@ function handleLogout() {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Mobile Sidebar In/Out Animations */
+.mobile-sidebar-enter-active,
+.mobile-sidebar-leave-active {
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-sidebar-enter-from,
+.mobile-sidebar-leave-to {
+  opacity: 0;
+}
+
+.mobile-sidebar-enter-active .sidebar-backdrop,
+.mobile-sidebar-leave-active .sidebar-backdrop {
+  transition: opacity 0.3s ease-in-out;
+}
+
+.mobile-sidebar-enter-from .sidebar-backdrop,
+.mobile-sidebar-leave-to .sidebar-backdrop {
+  opacity: 0;
+}
+
+.mobile-sidebar-enter-active .sidebar-panel,
+.mobile-sidebar-leave-active .sidebar-panel {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-sidebar-enter-from .sidebar-panel,
+.mobile-sidebar-leave-to .sidebar-panel {
+  transform: translateX(-100%);
+}
+</style>
