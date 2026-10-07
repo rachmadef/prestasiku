@@ -78,6 +78,32 @@ class StudentDispensationController extends Controller
     }
 
     /**
+     * Get list of peer students / classmates in the same school.
+     */
+    public function getClassmates(Request $request): JsonResponse
+    {
+        $student = $request->user()->student;
+        if (! $student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data profil siswa tidak ditemukan.',
+            ], 404);
+        }
+
+        $classmates = Student::where('school_id', $student->school_id)
+            ->where('id', '!=', $student->id)
+            ->select('id', 'full_name', 'nis', 'class_name')
+            ->orderBy('class_name')
+            ->orderBy('full_name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $classmates,
+        ]);
+    }
+
+    /**
      * Submit a new KBM dispensation request by student.
      */
     public function store(Request $request): JsonResponse
@@ -91,16 +117,23 @@ class StudentDispensationController extends Controller
         }
 
         $validated = $request->validate([
-            'competition_name' => 'required|string|max:255',
+            'competition_name' => 'nullable|string|max:255',
+            'competition_field' => 'nullable|string|max:255',
+            'competition_level' => 'nullable|string|max:100',
+            'organizer' => 'nullable|string|max:255',
+            'execution_type' => 'nullable|string|max:50',
+            'location' => 'nullable|string|max:255',
             'competition_id' => 'nullable|exists:competitions,id',
-            'dispensation_type' => ['required', Rule::in(['persiapan_latihan', 'pelaksanaan_lomba', 'lainnya'])],
-            'purpose' => 'required|string',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'dispensation_type' => ['nullable', Rule::in(['persiapan_latihan', 'pelaksanaan_lomba', 'lainnya'])],
+            'purpose' => 'nullable|string',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
             'start_time' => 'nullable|string',
             'end_time' => 'nullable|string',
             'is_all_day' => 'boolean',
             'supervisor_name' => 'nullable|string|max:255',
+            'homeroom_teacher' => 'nullable|string|max:255',
+            'phone_number' => 'nullable|string|max:50',
             'attachment_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'additional_student_ids' => 'nullable|array',
             'additional_student_ids.*' => [
@@ -119,23 +152,45 @@ class StudentDispensationController extends Controller
         $customFieldsData = null;
         if ($request->has('custom_fields_data')) {
             $rawCustom = $request->input('custom_fields_data');
-            $customFieldsData = is_string($rawCustom) ? json_decode($rawCustom, true) : $rawCustom;
+            $customFieldsData = is_string($rawCustom) ? json_decode($rawCustom, true) : ($rawCustom ?? []);
         }
+
+        $compName = $validated['competition_name'] ?? null;
+        if (! $compName && is_array($customFieldsData)) {
+            foreach ($customFieldsData as $val) {
+                if (is_string($val) && strlen($val) > 1) {
+                    $compName = $val;
+                    break;
+                }
+            }
+        }
+        $compName = $compName ?: 'Pengajuan Perizinan & Dispensasi Lomba';
+
+        $purpose = $validated['purpose'] ?? $compName;
+        $startDate = $validated['start_date'] ?? now()->toDateString();
+        $endDate = $validated['end_date'] ?? $startDate;
 
         DB::beginTransaction();
         try {
             $dispensation = KbmDispensation::create([
                 'school_id' => $student->school_id,
                 'competition_id' => $validated['competition_id'] ?? null,
-                'competition_name' => $validated['competition_name'],
-                'dispensation_type' => $validated['dispensation_type'],
-                'purpose' => $validated['purpose'],
-                'start_date' => $validated['start_date'],
-                'end_date' => $validated['end_date'],
+                'competition_name' => $compName,
+                'competition_field' => $validated['competition_field'] ?? null,
+                'competition_level' => $validated['competition_level'] ?? null,
+                'organizer' => $validated['organizer'] ?? null,
+                'execution_type' => $validated['execution_type'] ?? null,
+                'location' => $validated['location'] ?? null,
+                'dispensation_type' => $validated['dispensation_type'] ?? 'pelaksanaan_lomba',
+                'purpose' => $purpose,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
                 'start_time' => $validated['start_time'] ?? null,
                 'end_time' => $validated['end_time'] ?? null,
                 'is_all_day' => $request->boolean('is_all_day', true),
                 'supervisor_name' => $validated['supervisor_name'] ?? null,
+                'homeroom_teacher' => $validated['homeroom_teacher'] ?? null,
+                'phone_number' => $validated['phone_number'] ?? null,
                 'attachment_path' => $attachmentPath,
                 'custom_fields_data' => $customFieldsData,
                 'status' => 'pending',

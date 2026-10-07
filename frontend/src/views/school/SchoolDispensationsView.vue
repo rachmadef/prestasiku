@@ -4,6 +4,7 @@ import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import Modal from '@/components/common/Modal.vue'
 import api, { extractList } from '@/services/api'
 import { useNotify } from '@/composables/useNotify'
+import { formatDateIndo, formatDateRange } from '@/utils/date'
 
 const { toast } = useNotify()
 
@@ -467,7 +468,7 @@ onMounted(() => {
                 <!-- Jadwal Pelaksanaan -->
                 <td class="px-4 py-3.5 whitespace-nowrap">
                   <p class="font-semibold text-slate-800">
-                    {{ item.start_date }} <span class="text-slate-400 font-normal">s.d.</span> {{ item.end_date }}
+                    {{ formatDateRange(item.start_date, item.end_date) }}
                   </p>
                   <p class="text-[11px] text-slate-500 mt-0.5">
                     {{ item.is_all_day ? 'Seharian Penuh' : `${item.start_time || '-'} s.d. ${item.end_time || '-'}` }}
@@ -558,7 +559,7 @@ onMounted(() => {
           <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
             <div>
               <p class="text-[10px] uppercase font-bold text-slate-400">Periode Izin</p>
-              <p class="font-semibold text-slate-800">{{ selectedDisp.start_date }} s.d. {{ selectedDisp.end_date }}</p>
+              <p class="font-semibold text-slate-800">{{ formatDateRange(selectedDisp.start_date, selectedDisp.end_date) }}</p>
             </div>
             <div>
               <p class="text-[10px] uppercase font-bold text-slate-400">Guru Pendamping</p>
@@ -936,7 +937,7 @@ onMounted(() => {
             <div class="bg-slate-50 p-3 rounded-lg border border-slate-300 text-xs space-y-1 my-2">
               <p><span class="font-bold">Nama Kegiatan:</span> {{ printData.dispensation?.competition_name }}</p>
               <p><span class="font-bold">Keperluan:</span> {{ printData.dispensation?.purpose }}</p>
-              <p><span class="font-bold">Waktu Pelaksanaan:</span> {{ printData.dispensation?.start_date }} s.d. {{ printData.dispensation?.end_date }}</p>
+              <p><span class="font-bold">Waktu Pelaksanaan:</span> {{ formatDateRange(printData.dispensation?.start_date, printData.dispensation?.end_date) }}</p>
               <p><span class="font-bold">Guru Pembina:</span> {{ printData.dispensation?.supervisor_name || 'Pembina Lomba Sekolah' }}</p>
 
               <!-- Dynamic custom fields on printable letter -->

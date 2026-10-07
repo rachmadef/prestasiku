@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
+import { formatDateIndo, formatDateRange } from '@/utils/date'
 
 const route = useRoute()
 const token = ref((route.params.token as string) || '')
@@ -123,7 +124,7 @@ onMounted(() => {
               v-else
               class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white"
             >
-              Izin Mulai Berlaku: {{ verificationResult.start_date }}
+              Izin Mulai Berlaku: {{ formatDateIndo(verificationResult.start_date) }}
             </span>
           </div>
         </div>
@@ -143,7 +144,7 @@ onMounted(() => {
             <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Periode Tanggal</span>
-                <span class="font-bold text-slate-800">{{ verificationResult.start_date }} s.d. {{ verificationResult.end_date }}</span>
+                <span class="font-bold text-slate-800">{{ formatDateRange(verificationResult.start_date, verificationResult.end_date) }}</span>
               </div>
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Waktu</span>

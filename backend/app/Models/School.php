@@ -31,6 +31,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'letterhead_type',
     'letter_format_config',
     'dispensation_docx_template_path',
+    'permission_form_schema',
+    'permission_docx_template_path',
+    'permission_letter_format_config',
 ])]
 class School extends Model
 {
@@ -42,6 +45,8 @@ class School extends Model
             'verified_at' => 'datetime',
             'dispensation_form_schema' => 'array',
             'letter_format_config' => 'array',
+            'permission_form_schema' => 'array',
+            'permission_letter_format_config' => 'array',
         ];
     }
 

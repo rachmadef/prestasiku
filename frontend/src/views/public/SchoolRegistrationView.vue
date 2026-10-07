@@ -424,7 +424,7 @@ async function submitSchoolRegistration() {
                     <option v-for="dist in districtOptions" :key="dist.id" :value="dist.name">
                       {{ dist.name }}
                     </option>
-                    <option value="__custom__">✏️ Ketik Manual / Lainnya...</option>
+                    <option value="__custom__">Ketik Manual / Lainnya...</option>
                   </select>
                 </div>
 

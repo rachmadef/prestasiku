@@ -110,9 +110,9 @@ onMounted(() => {
           class="px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold focus:outline-hidden focus:border-brand-blue transition-colors cursor-pointer"
         >
           <option value="">Semua Waktu Lomba</option>
-          <option value="upcoming">🚀 Lomba Akan Datang</option>
-          <option value="this_month">📅 Pelaksanaan Bulan Ini</option>
-          <option value="next_month">🗓️ Pelaksanaan Bulan Depan</option>
+          <option value="upcoming">Lomba Akan Datang</option>
+          <option value="this_month">Pelaksanaan Bulan Ini</option>
+          <option value="next_month">Pelaksanaan Bulan Depan</option>
         </select>
       </div>
 

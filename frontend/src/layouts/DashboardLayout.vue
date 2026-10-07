@@ -80,8 +80,8 @@ const menuGroups = computed<MenuGroup[]>(() => {
         title: 'Operasional Sekolah',
         items: [
           { label: 'Dashboard Sekolah', path: '/school/dashboard', icon: 'fa-solid fa-gauge-high' },
-          { label: 'Perizinan Dispensasi KBM', path: '/school/dispensations', icon: 'fa-solid fa-file-signature' },
-          { label: 'Format Surat & Kop Dinas', path: '/school/dispensations/form-settings', icon: 'fa-solid fa-stamp' },
+          { label: 'Verifikasi Perizinan & Dispensasi', path: '/school/dispensations', icon: 'fa-solid fa-file-signature' },
+          { label: 'Pendamping & Bisyaroh', path: '/school/supervisors', icon: 'fa-solid fa-user-gear' },
           { label: 'Arsip Partisipasi Siswa', path: '/school/registrations', icon: 'fa-solid fa-clipboard-check' },
         ],
       },
@@ -107,7 +107,7 @@ const menuGroups = computed<MenuGroup[]>(() => {
         title: 'Aktivitas Saya',
         items: [
           { label: 'Beranda Siswa', path: '/student/dashboard', icon: 'fa-solid fa-house-user' },
-          { label: 'Izin Dispensasi KBM', path: '/student/dispensations', icon: 'fa-solid fa-file-signature' },
+          { label: 'Form Perizinan & Dispensasi', path: '/student/dispensations', icon: 'fa-solid fa-file-signature' },
         ],
       },
       {

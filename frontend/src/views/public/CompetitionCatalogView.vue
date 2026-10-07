@@ -332,9 +332,9 @@ watch(() => route.query.curation, (newC) => {
               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold focus:outline-hidden focus:border-brand-blue focus:bg-white transition-colors"
             >
               <option value="">Semua Status Pendaftaran</option>
-              <option value="open">🟢 Pendaftaran Sudah Dibuka</option>
-              <option value="not_started">⏳ Pendaftaran Belum Dibuka</option>
-              <option value="completed">🏁 Lomba Sudah Terlaksana</option>
+              <option value="open">Pendaftaran Sudah Dibuka</option>
+              <option value="not_started">Pendaftaran Belum Dibuka</option>
+              <option value="completed">Lomba Sudah Terlaksana</option>
             </select>
           </div>
 
@@ -346,9 +346,9 @@ watch(() => route.query.curation, (newC) => {
               class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-hidden focus:border-brand-blue focus:bg-white transition-colors"
             >
               <option value="">Semua Kepercayaan</option>
-              <option value="resmi_negara">🛡️ Resmi Negara</option>
-              <option value="terkurasi_puspresnas">🏅 Terkurasi Puspresnas</option>
-              <option value="bergengsi_non_kurasi">⭐ Bergengsi Non-Kurasi</option>
+              <option value="resmi_negara">Resmi Negara</option>
+              <option value="terkurasi_puspresnas">Terkurasi Puspresnas</option>
+              <option value="bergengsi_non_kurasi">Bergengsi Non-Kurasi</option>
             </select>
           </div>
 

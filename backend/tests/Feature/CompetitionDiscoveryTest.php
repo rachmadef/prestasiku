@@ -76,6 +76,8 @@ class CompetitionDiscoveryTest extends TestCase
 
     public function test_public_can_filter_competitions_by_month(): void
     {
+        \Illuminate\Support\Carbon::setTestNow('2026-09-15 12:00:00');
+
         $organizer = Organizer::create(['name' => 'Org', 'type' => 'kementerian']);
         $category = CompetitionCategory::create(['name' => 'Sains', 'slug' => 'sains']);
 
@@ -122,6 +124,8 @@ class CompetitionDiscoveryTest extends TestCase
         $responseNext = $this->getJson('/api/v1/competitions?timeline=next_month');
         $responseNext->assertStatus(200)
             ->assertJsonPath('data.data.0.slug', 'lomba-bulan-depan');
+
+        \Illuminate\Support\Carbon::setTestNow();
     }
 
     public function test_public_can_view_competition_detail(): void

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\KbmDispensation;
 use App\Models\Student;
 use App\Services\DispensationDocumentService;
+use App\Services\DocxTemplateParserService;
 use App\Services\QrCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,8 @@ class SchoolDispensationController extends Controller
 {
     public function __construct(
         protected QrCodeService $qrCodeService,
-        protected DispensationDocumentService $documentService
+        protected DispensationDocumentService $documentService,
+        protected DocxTemplateParserService $docxParser
     ) {
     }
 
@@ -435,6 +437,10 @@ class SchoolDispensationController extends Controller
             'document_title' => 'nullable|string|max:255',
             'reference_number_prefix' => 'nullable|string|max:100',
             'closing_text' => 'nullable|string|max:1000',
+            'header_width_mode' => 'nullable|string|in:contained,full',
+            'header_max_height' => 'nullable|integer|min:30|max:300',
+            'header_alignment' => 'nullable|string|in:left,center,right',
+            'header_margin_bottom' => 'nullable|integer|min:0|max:100',
         ]);
 
         $updates = [
@@ -477,6 +483,10 @@ class SchoolDispensationController extends Controller
         $config['document_title'] = $validated['document_title'] ?? ($config['document_title'] ?? 'SURAT KETERANGAN DISPENSASI BELAJAR (KBM)');
         $config['reference_number_prefix'] = $validated['reference_number_prefix'] ?? ($config['reference_number_prefix'] ?? '421.3/DISP-KBM');
         $config['closing_text'] = $validated['closing_text'] ?? ($config['closing_text'] ?? 'Demikian surat dispensasi ini dibuat agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya.');
+        $config['header_width_mode'] = $request->input('header_width_mode', $config['header_width_mode'] ?? 'contained');
+        $config['header_max_height'] = (int) $request->input('header_max_height', $config['header_max_height'] ?? 130);
+        $config['header_alignment'] = $request->input('header_alignment', $config['header_alignment'] ?? 'center');
+        $config['header_margin_bottom'] = (int) $request->input('header_margin_bottom', $config['header_margin_bottom'] ?? 10);
         $updates['letter_format_config'] = $config;
 
         $school->update($updates);
@@ -558,5 +568,27 @@ class SchoolDispensationController extends Controller
                 'message' => 'Gagal menghasilkan dokumen PDF: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Parse uploaded DOCX file and auto-generate form schema for KBM Dispensations.
+     */
+    public function parseDocxSchema(Request $request): JsonResponse
+    {
+        $request->validate([
+            'docx_file' => ['required', 'file', 'mimes:docx', 'max:5120'],
+        ]);
+
+        $file = $request->file('docx_file');
+        $extractedSchema = $this->docxParser->parseVariablesFromDocx($file->getRealPath());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil memindai file DOCX. ' . count($extractedSchema) . ' kolom variabel terdeteksi secara otomatis.',
+            'data' => [
+                'extracted_schema' => $extractedSchema,
+                'count' => count($extractedSchema),
+            ],
+        ]);
     }
 }

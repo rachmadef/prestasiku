@@ -16,16 +16,27 @@
             margin: 0;
             padding: 0;
         }
+        .page-break {
+            page-break-before: always;
+        }
         .kop-container {
-            text-align: center;
-            margin-bottom: 12px;
+            text-align: {{ $letterConfig['header_alignment'] ?? 'center' }};
+            margin-bottom: {{ $letterConfig['header_margin_bottom'] ?? 10 }}px;
         }
         .kop-image {
-            width: 100%;
-            max-height: 130px;
-            object-fit: contain;
             display: block;
-            margin: 0 auto;
+            margin: {{ ($letterConfig['header_alignment'] ?? 'center') === 'center' ? '0 auto' : (($letterConfig['header_alignment'] ?? 'center') === 'left' ? '0 auto 0 0' : '0 0 0 auto') }};
+            @if(($letterConfig['header_width_mode'] ?? 'contained') === 'full')
+                width: 100%;
+                height: auto;
+                max-height: none;
+                object-fit: fill;
+            @else
+                width: auto;
+                max-width: 100%;
+                max-height: {{ $letterConfig['header_max_height'] ?? 130 }}px;
+                object-fit: contain;
+            @endif
         }
         .kop-text-gov {
             font-size: 11pt;
@@ -80,53 +91,51 @@
             font-family: Arial, sans-serif;
             margin-top: 3px;
         }
+        .recipient-box {
+            margin-bottom: 14px;
+            font-size: 11pt;
+        }
         .doc-body {
             text-align: justify;
             margin-bottom: 12px;
         }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 10.5pt;
+        }
+        .info-table td {
+            padding: 3px 4px;
+            vertical-align: top;
+        }
+        .info-table td.label {
+            width: 140px;
+            font-weight: bold;
+        }
         .student-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 10px 0 14px 0;
-            font-size: 10pt;
-            font-family: Arial, sans-serif;
+            margin: 12px 0;
+            font-size: 10.5pt;
+            font-family: 'Times New Roman', Times, serif;
         }
         .student-table th, .student-table td {
-            border: 1px solid #4b5563;
-            padding: 5px 8px;
+            border: 1px solid #000;
+            padding: 6px 10px;
         }
         .student-table th {
             background-color: #f3f4f6;
             font-weight: bold;
             text-align: center;
-        }
-        .info-box {
-            background-color: #f9fafb;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            padding: 8px 12px;
-            margin: 10px 0;
+            text-transform: uppercase;
             font-size: 10pt;
-            font-family: Arial, sans-serif;
-        }
-        .info-box table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .info-box td {
-            padding: 2px 4px;
-            vertical-align: top;
-        }
-        .info-box td.label {
-            width: 140px;
-            font-weight: bold;
-            color: #1f2937;
         }
         .closing-text {
-            font-style: italic;
-            margin-top: 10px;
+            text-align: justify;
+            margin-top: 12px;
             margin-bottom: 20px;
-            font-size: 10pt;
+            font-size: 11pt;
         }
         .signatures-table {
             width: 100%;
@@ -167,8 +176,8 @@
             font-family: Arial, sans-serif;
         }
         .qr-section img {
-            width: 70px;
-            height: 70px;
+            width: 65px;
+            height: 65px;
             vertical-align: middle;
         }
         .qr-text {
@@ -177,11 +186,15 @@
             margin-left: 8px;
             font-size: 8pt;
             color: #4b5563;
-            max-width: 180px;
+            max-width: 200px;
         }
     </style>
 </head>
 <body>
+
+    <!-- ========================================================= -->
+    <!-- LEMBAR 1: SURAT DISPENSASI UTAMA                          -->
+    <!-- ========================================================= -->
 
     <!-- Kop Surat Sekolah -->
     <div class="kop-container">
@@ -201,110 +214,147 @@
         @endif
     </div>
 
-    <!-- Judul Dokumen & Nomor Registrasi -->
+    <!-- Judul Dokumen & Nomor -->
     <div class="doc-title-container">
-        <h1 class="doc-title">{{ $letterConfig['document_title'] ?? 'SURAT KETERANGAN DISPENSASI BELAJAR (KBM)' }}</h1>
+        <h1 class="doc-title">{{ $letterConfig['document_title'] ?? 'SURAT DISPENSASI' }}</h1>
         <div class="doc-ref-number">Nomor: {{ $dispensation->reference_number }}</div>
+    </div>
+
+    <!-- Kepada Yth -->
+    <div class="recipient-box">
+        Yang Terhormat,<br>
+        <strong>Bapak/Ibu Guru Mata Pelajaran / Guru Piket</strong><br>
+        Di Kelas
     </div>
 
     <!-- Pembuka Surat -->
     <div class="doc-body">
-        <p style="margin: 0 0 8px 0;">
-            Yang bertanda tangan di bawah ini, Kepala Sekolah / Bidang Kesiswaan {{ $school->name }}, dengan ini menerangkan dan memberikan izin dispensasi kepada siswa-siswi tersebut di bawah ini:
-        </p>
+        @if(count($students) > 1)
+            <p style="margin: 0 0 10px 0;">
+                Yang bertanda tangan di bawah ini, Kepala Sekolah / Bidang Kesiswaan {{ $school->name }}, memberikan izin dan dispensasi KBM kepada peserta didik berikut:
+                <strong style="text-decoration: underline;">(nama-nama terlampir)</strong>
+            </p>
+        @else
+            @php $singleStudent = $students->first(); @endphp
+            <p style="margin: 0 0 10px 0;">
+                Yang bertanda tangan di bawah ini, Kepala Sekolah / Bidang Kesiswaan {{ $school->name }}, memberikan izin dan dispensasi KBM kepada peserta didik berikut:
+            </p>
 
-        <!-- Tabel Delegasi Siswa -->
-        <table class="student-table">
-            <thead>
+            <!-- Details Single Student Langsung di Halaman Utama -->
+            <table class="info-table" style="margin: 6px 0 12px 0; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;">
                 <tr>
-                    <th style="width: 30px;">No</th>
-                    <th>Nama Siswa</th>
-                    <th style="width: 100px;">NIS / NISN</th>
-                    <th style="width: 90px;">Kelas</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($dispensation->students as $index => $student)
-                    <tr>
-                        <td style="text-align: center;">{{ $index + 1 }}</td>
-                        <td style="font-weight: bold;">{{ $student->full_name }}</td>
-                        <td style="text-align: center;">{{ $student->nis ?? '-' }} / {{ $student->nisn ?? '-' }}</td>
-                        <td style="text-align: center;">{{ $student->class_name ?? '-' }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-
-        <p style="margin: 8px 0 6px 0;">
-            Diberikan izin untuk tidak mengikuti Kegiatan Belajar Mengajar (KBM) di kelas sehubungan dengan keikutsertaan pada agenda kompetisi / pembinaan prestasi:
-        </p>
-
-        <!-- Kotak Rincian Kegiatan -->
-        <div class="info-box">
-            <table>
-                <tr>
-                    <td class="label">Nama Kegiatan</td>
-                    <td style="width: 10px;">:</td>
-                    <td style="font-weight: bold;">{{ $dispensation->competition_name }}</td>
+                    <td class="label" style="width: 140px; padding: 4px 8px;">Nama Peserta Didik</td>
+                    <td style="width: 10px; padding: 4px 0;">:</td>
+                    <td style="font-weight: bold; text-transform: uppercase; padding: 4px 8px;">{{ $singleStudent->full_name ?? '-' }}</td>
                 </tr>
                 <tr>
-                    <td class="label">Jenis Izin</td>
-                    <td>:</td>
-                    <td>
-                        @if($dispensation->dispensation_type === 'persiapan_latihan')
-                            Pembinaan & Latihan Intensif
-                        @elseif($dispensation->dispensation_type === 'pelaksanaan_lomba')
-                            Pelaksanaan Hari-H Lomba
-                        @else
-                            Kegiatan Prestasi Sekolah
-                        @endif
-                    </td>
+                    <td class="label" style="padding: 4px 8px;">Kelas</td>
+                    <td style="padding: 4px 0;">:</td>
+                    <td style="font-weight: bold; padding: 4px 8px;">{{ $singleStudent->class_name ?? '-' }}</td>
                 </tr>
                 <tr>
-                    <td class="label">Keperluan Izin</td>
-                    <td>:</td>
-                    <td>{{ $dispensation->purpose }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Waktu Pelaksanaan</td>
-                    <td>:</td>
-                    <td>
-                        {{ \Carbon\Carbon::parse($dispensation->start_date)->translatedFormat('d F Y') }}
-                        s.d.
-                        {{ \Carbon\Carbon::parse($dispensation->end_date)->translatedFormat('d F Y') }}
-                        @if(!$dispensation->is_all_day && $dispensation->start_time)
-                            ({{ $dispensation->start_time }} - {{ $dispensation->end_time }} WIB)
-                        @else
-                            (Seharian Penuh)
-                        @endif
-                    </td>
-                </tr>
-                <tr>
-                    <td class="label">Guru Pembina Lomba</td>
-                    <td>:</td>
-                    <td style="font-weight: bold;">{{ $dispensation->supervisor_name ?? 'Pembina Lomba Sekolah' }}</td>
+                    <td class="label" style="padding: 4px 8px;">NIS / NISN</td>
+                    <td style="padding: 4px 0;">:</td>
+                    <td style="padding: 4px 8px; font-family: Arial, sans-serif;">{{ $singleStudent->nis ?? '-' }} / {{ $singleStudent->nisn ?? '-' }}</td>
                 </tr>
             </table>
-        </div>
+        @endif
 
-        <!-- Kalimat Penutup -->
+        <!-- Rincian Keperluan & Pelaksanaan -->
+        <table class="info-table">
+            <tr>
+                <td class="label">Nama Kegiatan</td>
+                <td style="width: 10px;">:</td>
+                <td style="font-weight: bold;">{{ $dispensation->competition_name }}</td>
+            </tr>
+            @if(!empty($dispensation->competition_field))
+            <tr>
+                <td class="label">Bidang Lomba</td>
+                <td>:</td>
+                <td>{{ $dispensation->competition_field }}</td>
+            </tr>
+            @endif
+            @if(!empty($dispensation->competition_level))
+            <tr>
+                <td class="label">Tingkat Lomba</td>
+                <td>:</td>
+                <td style="text-transform: capitalize;">{{ $dispensation->competition_level }}</td>
+            </tr>
+            @endif
+            @if(!empty($dispensation->organizer))
+            <tr>
+                <td class="label">Penyelenggara</td>
+                <td>:</td>
+                <td>{{ $dispensation->organizer }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td class="label">Keperluan / Agenda</td>
+                <td>:</td>
+                <td>{{ $dispensation->purpose }}</td>
+            </tr>
+            <tr>
+                <td class="label">Hari & Tanggal</td>
+                <td>:</td>
+                <td>
+                    {{ \Carbon\Carbon::parse($dispensation->start_date)->translatedFormat('l, d F Y') }}
+                    @if($dispensation->start_date != $dispensation->end_date)
+                        s.d. {{ \Carbon\Carbon::parse($dispensation->end_date)->translatedFormat('l, d F Y') }}
+                    @endif
+                </td>
+            </tr>
+            <tr>
+                <td class="label">Waktu Pelaksanaan</td>
+                <td>:</td>
+                <td>
+                    @if(!$dispensation->is_all_day && $dispensation->start_time)
+                        {{ $dispensation->start_time }} - {{ $dispensation->end_time }} WIB
+                    @else
+                        Seharian Penuh (Jam KBM)
+                    @endif
+                </td>
+            </tr>
+            @if(!empty($dispensation->location))
+            <tr>
+                <td class="label">Tempat / Lokasi</td>
+                <td>:</td>
+                <td>{{ $dispensation->location }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td class="label">Guru Pembina / Pendamping</td>
+                <td>:</td>
+                <td style="font-weight: bold;">{{ $dispensation->supervisor_name ?? 'Pembina Lomba Sekolah' }}</td>
+            </tr>
+            @if(!empty($dispensation->homeroom_teacher))
+            <tr>
+                <td class="label">Wali Kelas</td>
+                <td>:</td>
+                <td>{{ $dispensation->homeroom_teacher }}</td>
+            </tr>
+            @endif
+        </table>
+
+        <!-- Penutup Surat -->
         <p class="closing-text">
-            Demikian surat dispensasi ini diterbitkan agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya. Siswa yang bersangkutan tetap berkewajiban menyelesaikan materi serta tugas-tugas pelajaran yang tertinggal.
+            @if(count($students) > 1)
+                Mohon dengan hormat Bapak/Ibu guru memberikan izin kepada nama-nama peserta didik terlampir untuk tidak mengikuti pembelajaran sesuai waktu yang telah ditentukan. Siswa yang bersangkutan tetap berkewajiban menyelesaikan materi pelajaran serta tugas-tugas yang tertinggal.
+            @else
+                Mohon dengan hormat Bapak/Ibu guru memberikan izin kepada peserta didik di atas untuk tidak mengikuti pembelajaran sesuai waktu yang telah ditentukan. Siswa yang bersangkutan tetap berkewajiban menyelesaikan materi pelajaran serta tugas-tugas yang tertinggal.
+            @endif
         </p>
     </div>
 
-    <!-- 2 Kolom Tanda Tangan Resmi Sesuai Kebutuhan di Lapangan -->
-    <table class="signatures-table">
+    <!-- Tanda Tangan Resmi Sesuai Ketentuan (Guru Pembina, Waka Kesiswaan & Kosongan Wali Kelas) -->
+    <table class="signatures-table" style="margin-top: 15px;">
         <tr>
-            <!-- Tanda Tangan 1: Guru Pembina Lomba (Terisi Otomatis) -->
-            <td>
+            <!-- Tanda Tangan 1: Guru Pembina / Pendamping -->
+            <td style="width: 50%; vertical-align: top; text-align: center;">
                 <div style="font-size: 9.5pt; color: #374151; margin-bottom: 2px;">
-                    Ditetapkan di: {{ $school->city ?? 'Tempat' }}<br>
-                    Pada tanggal: {{ \Carbon\Carbon::parse($dispensation->approved_at ?? now())->translatedFormat('d F Y') }}
+                    {{ $school->city ?? 'Jombang' }}, {{ \Carbon\Carbon::parse($dispensation->approved_at ?? now())->translatedFormat('d F Y') }}
                 </div>
                 <div class="signature-title">
-                    Mengetahui,<br>
-                    Guru Pembina Lomba
+                    Guru Pembina / Pendamping
                 </div>
                 <div class="signature-name">
                     {{ $dispensation->supervisor_name ?: 'Pembina Lomba Prestasi' }}
@@ -314,29 +364,46 @@
                 </div>
             </td>
 
-            <!-- Tanda Tangan 2: Guru Mata Pelajaran / Guru Piket (Dikosongkan Karena Jam Mengajar Fleksibel) -->
-            <td>
-                <div style="font-size: 9.5pt; color: transparent; margin-bottom: 2px;">
-                    .<br>.
+            <!-- Tanda Tangan 2: Waka Kesiswaan -->
+            <td style="width: 50%; vertical-align: top; text-align: center;">
+                <div style="font-size: 9.5pt; color: #374151; margin-bottom: 2px;">
+                    Mengetahui / Menyetujui,
                 </div>
                 <div class="signature-title">
-                    Menyetujui / Memaklumi,<br>
-                    Guru Mata Pelajaran / Guru Piket
+                    Waka Kesiswaan
                 </div>
-                <div class="signature-name" style="text-decoration: none;">
+                <div class="signature-name">
+                    {{ $letterConfig['waka_kesiswaan_name'] ?? ($dispensation->approvedBy->name ?? 'Drs. H. Abdul Haris') }}
+                </div>
+                <div class="signature-nip">
+                    {{ $letterConfig['waka_kesiswaan_nip'] ?? 'NIP. Sekolah / Pengesahan Resmi' }}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Tanda Tangan 3: Kosongan untuk Wali Kelas / Guru Mapel di Kelas -->
+    <table class="signatures-table" style="margin-top: 20px;">
+        <tr>
+            <td style="width: 100%; text-align: center;">
+                <div class="signature-title">
+                    Menyetujui / Memaklumi,<br>
+                    Wali Kelas / Guru Mata Pelajaran
+                </div>
+                <div class="signature-name" style="margin-top: 45px;">
                     ( .................................................... )
                 </div>
                 <div class="signature-nip">
                     NIP. ..............................................
                 </div>
                 <div class="signature-note">
-                    * Ditandatangani saat jam KBM berlangsung di kelas
+                    *(Ditandatangani saat jam KBM di kelas)*
                 </div>
             </td>
         </tr>
     </table>
 
-    <!-- Stempel Validasi QR Code Digital PrestasiKu -->
+    <!-- Stempel Validasi QR Code Digital -->
     @if(!empty($qrCodeDataUri))
         <div class="qr-section">
             <table style="width: auto; border-collapse: collapse;">
@@ -345,12 +412,96 @@
                         <img src="{{ $qrCodeDataUri }}" alt="QR Verifikasi" />
                     </td>
                     <td style="padding-left: 8px; vertical-align: middle; font-size: 8pt; color: #4b5563;">
-                        <strong>Sistem Validasi PrestasiKu</strong><br>
-                        Pindai QR ini untuk memeriksa keabsahan surat secara publik tanpa perlu login.
+                        <strong>Sistem Validasi Resmi PrestasiKu</strong><br>
+                        Pindai QR ini untuk mengecek keabsahan surat & lampiran siswa secara publik.
                     </td>
                 </tr>
             </table>
         </div>
+    @endif
+
+
+    @if(count($students) > 1)
+        <!-- ========================================================= -->
+        <!-- LEMBAR 2: LAMPIRAN DAFTAR PESERTA DIDIK (PAGE BREAK)      -->
+        <!-- ========================================================= -->
+
+        <div class="page-break"></div>
+
+        <!-- Kop Surat Sekolah Lembar 2 -->
+        <div class="kop-container">
+            @if (!empty($letterheadImageBase64))
+                <img src="{{ $letterheadImageBase64 }}" alt="Kop Surat" class="kop-image" />
+            @else
+                <p class="kop-text-gov">{{ $letterConfig['institution_level1'] ?? 'PEMERINTAH PROVINSI' }}</p>
+                <p class="kop-text-agency">{{ $letterConfig['institution_level2'] ?? 'DINAS PENDIDIKAN DAN KEBUDAYAAN' }}</p>
+                <p class="kop-text-school">{{ $school->name }}</p>
+                <p class="kop-text-meta">
+                    {{ $school->address }} • NPSN: {{ $school->npsn }}
+                    @if($school->phone) • Telp: {{ $school->phone }} @endif
+                    @if($school->email) • Email: {{ $school->email }} @endif
+                </p>
+                <div class="kop-line-thick"></div>
+                <div class="kop-line-thin"></div>
+            @endif
+        </div>
+
+        <!-- Judul Lampiran -->
+        <div class="doc-title-container">
+            <h2 style="font-size: 11.5pt; font-weight: bold; text-decoration: underline; text-transform: uppercase; margin: 0;">
+                LAMPIRAN DAFTAR PESERTA DIDIK PENERIMA DISPENSASI KBM
+            </h2>
+            <div class="doc-ref-number">
+                Surat Nomor: <strong>{{ $dispensation->reference_number }}</strong> • Agenda: {{ $dispensation->competition_name }}
+            </div>
+        </div>
+
+        <!-- Tabel Daftar Peserta Didik (Lembar 2) -->
+        <table class="student-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">NO</th>
+                    <th>NAMA PESERTA DIDIK</th>
+                    <th style="width: 120px;">NIS / NISN</th>
+                    <th style="width: 110px;">KELAS</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($dispensation->students as $index => $student)
+                    <tr>
+                        <td style="text-align: center; font-weight: bold;">{{ $index + 1 }}</td>
+                        <td style="font-weight: bold; text-transform: uppercase;">{{ $student->full_name }}</td>
+                        <td style="text-align: center; font-family: Arial, sans-serif;">{{ $student->nis ?? '-' }} / {{ $student->nisn ?? '-' }}</td>
+                        <td style="text-align: center; font-weight: bold;">{{ $student->class_name ?? '-' }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="4" style="text-align: center; font-style: italic;">Tidak ada data siswa terlampir.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+
+        <!-- Tanda Tangan Pengesahan Lampiran -->
+        <table class="signatures-table" style="margin-top: 30px;">
+            <tr>
+                <td style="width: 50%;"></td>
+                <td style="width: 50%;">
+                    <div style="font-size: 9.5pt; color: #374151; margin-bottom: 2px;">
+                        {{ $school->city ?? 'Jombang' }}, {{ \Carbon\Carbon::parse($dispensation->approved_at ?? now())->translatedFormat('d F Y') }}
+                    </div>
+                    <div class="signature-title">
+                        Guru Pembina / Pendamping
+                    </div>
+                    <div class="signature-name">
+                        {{ $dispensation->supervisor_name ?: 'Pembina Lomba Prestasi' }}
+                    </div>
+                    <div class="signature-nip">
+                        NIP. - / Pembina Prestasi Sekolah
+                    </div>
+                </td>
+            </tr>
+        </table>
     @endif
 
 </body>

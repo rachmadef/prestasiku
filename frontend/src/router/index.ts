@@ -113,6 +113,16 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/school/SchoolRegistrationsView.vue'),
       },
       {
+        path: 'permissions',
+        name: 'school.permissions',
+        component: () => import('@/views/school/SchoolPermissionsView.vue'),
+      },
+      {
+        path: 'permissions/form-settings',
+        name: 'school.permissions.form-settings',
+        component: () => import('@/views/school/SchoolPermissionFormBuilderView.vue'),
+      },
+      {
         path: 'dispensations',
         name: 'school.dispensations',
         component: () => import('@/views/school/SchoolDispensationsView.vue'),
@@ -126,6 +136,11 @@ const routes: RouteRecordRaw[] = [
         path: 'achievements',
         name: 'school.achievements',
         component: () => import('@/views/school/SchoolAchievementsView.vue'),
+      },
+      {
+        path: 'supervisors',
+        name: 'school.supervisors',
+        component: () => import('@/views/school/SchoolSupervisorsView.vue'),
       },
       {
         path: 'profile',
@@ -154,9 +169,19 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/student/StudentPortfolioView.vue'),
       },
       {
+        path: 'permissions',
+        name: 'student.permissions',
+        component: () => import('@/views/student/StudentPermissionsView.vue'),
+      },
+      {
         path: 'dispensations',
         name: 'student.dispensations',
         component: () => import('@/views/student/StudentDispensationsView.vue'),
+      },
+      {
+        path: 'dispensations/create',
+        name: 'student.dispensations.create',
+        component: () => import('@/views/student/StudentDispensationCreateView.vue'),
       },
       {
         path: 'competitions',

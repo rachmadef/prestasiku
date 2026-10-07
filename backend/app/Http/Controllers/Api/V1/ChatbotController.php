@@ -19,16 +19,17 @@ class ChatbotController extends Controller
         $request->validate([
             'message' => 'required|string|max:1000',
             'history' => 'nullable|array',
-            'history.*.role' => 'required|in:user,model',
-            'history.*.parts' => 'required|array',
+            'history.*.role' => 'required|in:user,model,assistant',
+            'history.*.parts' => 'nullable|array',
         ]);
 
-        $apiKey = config('services.gemini.api_key');
+        $groqApiKey = config('services.groq.api_key');
+        $geminiApiKey = config('services.gemini.api_key');
 
-        if (empty($apiKey)) {
+        if (empty($groqApiKey) && empty($geminiApiKey)) {
             return response()->json([
                 'success' => false,
-                'message' => 'API Key Gemini belum dikonfigurasi di server.',
+                'message' => 'API Key AI (Groq / Gemini) belum dikonfigurasi di server.',
             ], 500);
         }
 
@@ -49,7 +50,7 @@ Prestasiku adalah platform digital manajemen prestasi siswa, katalog dan kurasi 
    - Pengenalan website Prestasiku, fungsi, dan manfaatnya.
    - Katalog kompetisi, kategori lomba, kurasi resmi negara/bergengsi, eligibilitas, serta filter status pendaftaran (Pendaftaran Sudah Dibuka, Pendaftaran Belum Dibuka, dan Lomba Sudah Terlaksana).
    - Alur pendaftaran perlombaan (perorangan maupun tim).
-   - Pengajuan, persetujuan, dan pencetakan Surat Dispensasi KBM beserta verifikasi QR Code.
+   - Pengajuan, persetujuan, dan pencetakan Surat Dispensasi KBM & Perizinan Lomba beserta verifikasi QR Code.
    - Pengunggahan sertifikat, pembentukan portofolio prestasi siswa, dan verifikasi sekolah.
    - Pendaftaran sekolah baru, manajemen akun siswa, serta fitur-fitur website.
    - Pertanyaan umum seputar perlombaan, persiapan lomba, pendidikan, dan pengembangan talenta siswa.
@@ -69,49 +70,153 @@ Prestasiku adalah platform digital manajemen prestasi siswa, katalog dan kurasi 
 {$contextData}
 EOT;
 
-        // Clean up history to ensure invalid or error messages are excluded
-        $cleanHistory = [];
-        foreach ($history as $chatItem) {
-            $parts = $chatItem['parts'] ?? [];
-            $text = $parts[0]['text'] ?? '';
-            $role = $chatItem['role'] ?? 'user';
+        // 1. Try Groq API first if key available
+        if (!empty($groqApiKey)) {
+            $groqReply = $this->callGroqApi($groqApiKey, $systemInstructionText, $history, $userMessage);
+            if ($groqReply !== null) {
+                return response()->json([
+                    'success' => true,
+                    'reply' => $groqReply,
+                ]);
+            }
+            Log::warning('Groq API failed or returned empty response. Falling back to Gemini...');
+        }
 
-            // Filter out system error messages if present in history
+        // 2. Fallback to Gemini API if Groq fails or unavailable
+        if (!empty($geminiApiKey)) {
+            $geminiReply = $this->callGeminiApi($geminiApiKey, $systemInstructionText, $history, $userMessage);
+            if ($geminiReply !== null) {
+                return response()->json([
+                    'success' => true,
+                    'reply' => $geminiReply,
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal mendapatkan tanggapan dari AI Chatbot saat ini. Silakan coba beberapa saat lagi.',
+        ], 502);
+    }
+
+    /**
+     * Call Groq Cloud OpenAI-Compatible API using system cURL / Laravel Http
+     */
+    private function callGroqApi(string $apiKey, string $systemPrompt, array $rawHistory, string $userMessage): ?string
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt]
+        ];
+
+        foreach ($rawHistory as $chatItem) {
+            $role = ($chatItem['role'] ?? 'user') === 'model' ? 'assistant' : 'user';
+            $text = '';
+            if (isset($chatItem['parts'][0]['text'])) {
+                $text = $chatItem['parts'][0]['text'];
+            } elseif (isset($chatItem['content'])) {
+                $text = $chatItem['content'];
+            }
+
+            if (!empty($text) && !str_contains($text, 'Gagal mendapatkan tanggapan') && !str_contains($text, '⚠️')) {
+                $messages[] = [
+                    'role' => $role,
+                    'content' => $text,
+                ];
+            }
+        }
+
+        $messages[] = [
+            'role' => 'user',
+            'content' => $userMessage,
+        ];
+
+        // Available models on this Groq key
+        $models = [
+            'openai/gpt-oss-120b',
+            'qwen/qwen3.8-27b',
+            'openai/gpt-oss-20b',
+        ];
+
+        foreach ($models as $model) {
+            $payload = [
+                'model' => $model,
+                'messages' => $messages,
+                'temperature' => 0.5,
+                'max_tokens' => 500,
+            ];
+
+            // Primary: System curl.exe
+            try {
+                $tempFile = sys_get_temp_dir() . '/groq_req_' . uniqid() . '.json';
+                file_put_contents($tempFile, json_encode($payload));
+
+                $cmd = 'curl.exe -s -k -X POST -H "Authorization: Bearer ' . $apiKey . '" -H "Content-Type: application/json" --data-binary "@' . str_replace('\\', '/', $tempFile) . '" "https://api.groq.com/openai/v1/chat/completions"';
+                $output = shell_exec($cmd);
+                @unlink($tempFile);
+
+                if (!empty($output)) {
+                    $json = json_decode($output, true);
+                    if (isset($json['choices'][0]['message']['content'])) {
+                        return trim($json['choices'][0]['message']['content']);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error("Groq cURL error for {$model}: " . $e->getMessage());
+            }
+
+            // Secondary: Laravel Http client
+            try {
+                $response = Http::withOptions(['verify' => false, 'timeout' => 10])
+                    ->withHeaders([
+                        'Authorization' => 'Bearer ' . $apiKey,
+                        'Content-Type' => 'application/json',
+                    ])
+                    ->post('https://api.groq.com/openai/v1/chat/completions', $payload);
+
+                if ($response->successful()) {
+                    $json = $response->json();
+                    if (isset($json['choices'][0]['message']['content'])) {
+                        return trim($json['choices'][0]['message']['content']);
+                    }
+                }
+            } catch (\Throwable $t) {
+                Log::error("Groq Http error for {$model}: " . $t->getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fallback Gemini API call
+     */
+    private function callGeminiApi(string $apiKey, string $systemPrompt, array $rawHistory, string $userMessage): ?string
+    {
+        $cleanHistory = [];
+        foreach ($rawHistory as $chatItem) {
+            $text = $chatItem['parts'][0]['text'] ?? '';
+            $role = ($chatItem['role'] ?? 'user') === 'model' ? 'model' : 'user';
+
             if (!empty($text) && !str_contains($text, 'Gagal mendapatkan tanggapan') && !str_contains($text, '⚠️')) {
                 $cleanHistory[] = [
-                    'role' => $role === 'model' ? 'model' : 'user',
-                    'parts' => [
-                        ['text' => $text]
-                    ]
+                    'role' => $role,
+                    'parts' => [['text' => $text]]
                 ];
             }
         }
 
         $contents = array_merge($cleanHistory, [
-            [
-                'role' => 'user',
-                'parts' => [
-                    ['text' => $userMessage]
-                ]
-            ]
+            ['role' => 'user', 'parts' => [['text' => $userMessage]]]
         ]);
 
-        // Prioritize ultra-fast and reliable Gemini models
         $models = [
             'gemini-3.1-flash-lite',
             'gemini-3.6-flash',
             'gemini-flash-latest',
-            'gemini-flash-lite-latest',
-            'gemini-3.5-flash-lite',
-            'gemini-3.8-flash',
         ];
 
         $payload = [
-            'systemInstruction' => [
-                'parts' => [
-                    ['text' => $systemInstructionText]
-                ]
-            ],
+            'systemInstruction' => ['parts' => [['text' => $systemPrompt]]],
             'contents' => $contents,
             'generationConfig' => [
                 'temperature' => 0.5,
@@ -119,82 +224,25 @@ EOT;
             ],
         ];
 
-        $successfulResponse = null;
-        $lastError = '';
-
         foreach ($models as $modelName) {
             $url = "https://generativelanguage.googleapis.com/v1beta/models/{$modelName}:generateContent?key={$apiKey}";
-
-            // 1. Try Laravel Http Client first
             try {
-                $response = Http::withOptions([
-                    'verify' => false,
-                    'timeout' => 10,
-                ])->withHeaders([
-                    'Content-Type' => 'application/json',
-                ])->post($url, $payload);
+                $tempFile = sys_get_temp_dir() . '/gemini_req_' . uniqid() . '.json';
+                file_put_contents($tempFile, json_encode($payload));
 
-                if ($response->successful()) {
-                    $json = $response->json();
+                $cmd = 'curl.exe -s -k -X POST -H "Content-Type: application/json" --data-binary "@' . str_replace('\\', '/', $tempFile) . '" "' . $url . '"';
+                $output = shell_exec($cmd);
+                @unlink($tempFile);
+
+                if (!empty($output)) {
+                    $json = json_decode($output, true);
                     if (isset($json['candidates'][0]['content']['parts'][0]['text'])) {
-                        $successfulResponse = $json;
-                        break;
+                        return trim($json['candidates'][0]['content']['parts'][0]['text']);
                     }
                 }
-            } catch (\Throwable $e) {
-                Log::info("Gemini Http exception for {$modelName}: " . $e->getMessage());
+            } catch (\Throwable $t) {
+                Log::error("Gemini fallback error for {$modelName}: " . $t->getMessage());
             }
-
-            // 2. Always try cURL fallback if Http client fails or is unsupported
-            $curlResponse = $this->callGeminiViaCurl($url, $payload);
-            if ($curlResponse && isset($curlResponse['candidates'][0]['content']['parts'][0]['text'])) {
-                $successfulResponse = $curlResponse;
-                break;
-            }
-
-            if (isset($curlResponse['error']['message'])) {
-                $lastError = $curlResponse['error']['message'];
-            }
-        }
-
-        if (!$successfulResponse) {
-            Log::error('All Gemini API models failed. Last error: ' . $lastError);
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mendapatkan tanggapan dari Gemini AI.',
-            ], 502);
-        }
-
-        $replyText = $successfulResponse['candidates'][0]['content']['parts'][0]['text'] ?? 'Maaf, tidak ada tanggapan yang dihasilkan.';
-
-        return response()->json([
-            'success' => true,
-            'reply' => $replyText,
-        ]);
-    }
-
-    /**
-     * Fallback method using system curl.exe for maximum performance and compatibility.
-     */
-    private function callGeminiViaCurl(string $url, array $payload): ?array
-    {
-        try {
-            $tempFile = sys_get_temp_dir() . '/gemini_payload_' . uniqid() . '.json';
-            file_put_contents($tempFile, json_encode($payload));
-
-            $cmd = 'curl.exe -s -k -X POST -H "Content-Type: application/json" --data-binary "@' . str_replace('\\', '/', $tempFile) . '" "' . $url . '"';
-            $output = shell_exec($cmd);
-
-            @unlink($tempFile);
-
-            if (!empty($output)) {
-                $json = json_decode($output, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    return $json;
-                }
-            }
-        } catch (\Throwable $t) {
-            Log::error('cURL fallback execution failed: ' . $t->getMessage());
         }
 
         return null;

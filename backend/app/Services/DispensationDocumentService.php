@@ -102,9 +102,24 @@ class DispensationDocumentService
         }
 
         if ($letterheadImagePath && ($school->letterhead_type ?? 'text') === 'image') {
+            $config = $school->letter_format_config ?? [];
+            $widthMode = $config['header_width_mode'] ?? 'contained';
+            $maxHeight = (int) ($config['header_max_height'] ?? 130);
+            $alignStr = $config['header_alignment'] ?? 'center';
+
+            $align = Jc::CENTER;
+            if ($alignStr === 'left') {
+                $align = Jc::LEFT;
+            } elseif ($alignStr === 'right') {
+                $align = Jc::RIGHT;
+            }
+
+            $imageWidth = ($widthMode === 'full') ? 480 : 450;
+
             $section->addImage($letterheadImagePath, [
-                'width' => 450,
-                'alignment' => Jc::CENTER,
+                'width' => $imageWidth,
+                'height' => ($widthMode === 'full') ? null : $maxHeight,
+                'alignment' => $align,
                 'wrappingStyle' => 'inline',
             ]);
             $section->addTextBreak(1);
@@ -148,41 +163,52 @@ class DispensationDocumentService
             'bold' => true,
         ], ['alignment' => Jc::CENTER, 'spaceAfter' => 180]);
 
-        // 3. PEMBUKA SURAT
-        $section->addText(
-            "Yang bertanda tangan di bawah ini, Kepala Sekolah / Bidang Kesiswaan {$school->name}, dengan ini menerangkan bahwa siswa-siswi tersebut di bawah ini:",
-            ['name' => 'Times New Roman', 'size' => 11],
-            ['alignment' => Jc::BOTH, 'spaceAfter' => 100]
-        );
+        $studentCount = count($dispensation->students);
 
-        // 4. TABEL DELEGASI SISWA
-        $tableStyle = [
-            'borderColor' => '4B5563',
-            'borderSize' => 6,
-            'cellMargin' => 80,
-            'alignment' => JcTable::CENTER,
-        ];
-        $phpWord->addTableStyle('StudentTable', $tableStyle);
-        $table = $section->addTable('StudentTable');
+        // 3. PEMBUKA SURAT & DETAILS SISWA
+        if ($studentCount > 1) {
+            $section->addText(
+                "Yang bertanda tangan di bawah ini, Kepala Sekolah / Bidang Kesiswaan {$school->name}, memberikan izin dan dispensasi KBM kepada peserta didik berikut: (nama-nama terlampir)",
+                ['name' => 'Times New Roman', 'size' => 11],
+                ['alignment' => Jc::BOTH, 'spaceAfter' => 100]
+            );
+        } else {
+            $singleStudent = $dispensation->students->first();
+            $section->addText(
+                "Yang bertanda tangan di bawah ini, Kepala Sekolah / Bidang Kesiswaan {$school->name}, memberikan izin dan dispensasi KBM kepada peserta didik berikut:",
+                ['name' => 'Times New Roman', 'size' => 11],
+                ['alignment' => Jc::BOTH, 'spaceAfter' => 80]
+            );
 
-        // Header Tabel
-        $table->addRow(350);
-        $table->addCell(600, ['bgColor' => 'F3F4F6'])->addText('No', ['name' => 'Arial', 'size' => 9.5, 'bold' => true], ['alignment' => Jc::CENTER]);
-        $table->addCell(3600, ['bgColor' => 'F3F4F6'])->addText('Nama Siswa', ['name' => 'Arial', 'size' => 9.5, 'bold' => true]);
-        $table->addCell(1600, ['bgColor' => 'F3F4F6'])->addText('NIS / NISN', ['name' => 'Arial', 'size' => 9.5, 'bold' => true], ['alignment' => Jc::CENTER]);
-        $table->addCell(1400, ['bgColor' => 'F3F4F6'])->addText('Kelas', ['name' => 'Arial', 'size' => 9.5, 'bold' => true], ['alignment' => Jc::CENTER]);
+            // Details Single Student Langsung di Halaman Utama
+            $singleTableStyle = [
+                'borderColor' => 'E5E7EB',
+                'borderSize' => 4,
+                'cellMargin' => 60,
+                'alignment' => JcTable::CENTER,
+            ];
+            $phpWord->addTableStyle('SingleStudentTable', $singleTableStyle);
+            $singleTable = $section->addTable('SingleStudentTable');
+            
+            $singleTable->addRow(280);
+            $singleTable->addCell(2400, ['bgColor' => 'F9FAFB'])->addText('Nama Peserta Didik', ['name' => 'Arial', 'size' => 9.5, 'bold' => true]);
+            $singleTable->addCell(300, ['bgColor' => 'F9FAFB'])->addText(':', ['name' => 'Arial', 'size' => 9.5]);
+            $singleTable->addCell(4500, ['bgColor' => 'F9FAFB'])->addText(strtoupper($singleStudent->full_name ?? '-'), ['name' => 'Arial', 'size' => 9.5, 'bold' => true]);
 
-        foreach ($dispensation->students as $idx => $student) {
-            $table->addRow(300);
-            $table->addCell(600)->addText((string) ($idx + 1), ['name' => 'Arial', 'size' => 9], ['alignment' => Jc::CENTER]);
-            $table->addCell(3600)->addText($student->full_name, ['name' => 'Arial', 'size' => 9, 'bold' => true]);
-            $table->addCell(1600)->addText(($student->nis ?? '-') . ' / ' . ($student->nisn ?? '-'), ['name' => 'Arial', 'size' => 9], ['alignment' => Jc::CENTER]);
-            $table->addCell(1400)->addText($student->class_name ?? '-', ['name' => 'Arial', 'size' => 9], ['alignment' => Jc::CENTER]);
+            $singleTable->addRow(280);
+            $singleTable->addCell(2400)->addText('Kelas', ['name' => 'Arial', 'size' => 9.5, 'bold' => true]);
+            $singleTable->addCell(300)->addText(':', ['name' => 'Arial', 'size' => 9.5]);
+            $singleTable->addCell(4500)->addText($singleStudent->class_name ?? '-', ['name' => 'Arial', 'size' => 9.5, 'bold' => true]);
+
+            $singleTable->addRow(280);
+            $singleTable->addCell(2400)->addText('NIS / NISN', ['name' => 'Arial', 'size' => 9.5, 'bold' => true]);
+            $singleTable->addCell(300)->addText(':', ['name' => 'Arial', 'size' => 9.5]);
+            $singleTable->addCell(4500)->addText(($singleStudent->nis ?? '-') . ' / ' . ($singleStudent->nisn ?? '-'), ['name' => 'Arial', 'size' => 9.5]);
+
+            $section->addTextBreak(1);
         }
 
-        $section->addTextBreak(1);
-
-        // 5. RINCIAN KEGIATAN
+        // 4. RINCIAN KEGIATAN
         $section->addText(
             'Diberikan izin untuk tidak mengikuti Kegiatan Belajar Mengajar (KBM) di kelas sehubungan dengan keikutsertaan pada agenda kompetisi / pembinaan prestasi:',
             ['name' => 'Times New Roman', 'size' => 11],
@@ -213,11 +239,26 @@ class DispensationDocumentService
 
         $fields = [
             'Nama Kegiatan' => $dispensation->competition_name,
-            'Jenis Dispensasi' => $typeLabel,
-            'Keperluan Izin' => $dispensation->purpose,
-            'Waktu Pelaksanaan' => $period,
-            'Guru Pembina Lomba' => $dispensation->supervisor_name ?: 'Pembina Lomba Prestasi Sekolah',
         ];
+        if (! empty($dispensation->competition_field)) {
+            $fields['Bidang Lomba'] = $dispensation->competition_field;
+        }
+        if (! empty($dispensation->competition_level)) {
+            $fields['Tingkat Lomba'] = ucfirst($dispensation->competition_level);
+        }
+        if (! empty($dispensation->organizer)) {
+            $fields['Penyelenggara'] = $dispensation->organizer;
+        }
+        $fields['Jenis Dispensasi'] = $typeLabel;
+        $fields['Keperluan / Agenda'] = $dispensation->purpose;
+        $fields['Waktu Pelaksanaan'] = $period;
+        if (! empty($dispensation->location)) {
+            $fields['Tempat / Lokasi'] = $dispensation->location;
+        }
+        $fields['Guru Pembina / Pendamping'] = $dispensation->supervisor_name ?: 'Pembina Lomba Prestasi Sekolah';
+        if (! empty($dispensation->homeroom_teacher)) {
+            $fields['Wali Kelas'] = $dispensation->homeroom_teacher;
+        }
 
         foreach ($fields as $label => $val) {
             $infoTable->addRow(280);
@@ -228,16 +269,19 @@ class DispensationDocumentService
 
         $section->addTextBreak(1);
 
-        // 6. PENUTUP
+        // 5. PENUTUP
+        $closingTextStr = ($studentCount > 1)
+            ? 'Demikian surat dispensasi ini diterbitkan agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya. Siswa-siswi terlampir tetap berkewajiban menyelesaikan materi serta tugas-tugas pelajaran yang tertinggal.'
+            : 'Demikian surat dispensasi ini diterbitkan agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya. Siswa yang bersangkutan tetap berkewajiban menyelesaikan materi serta tugas-tugas pelajaran yang tertinggal.';
+
         $section->addText(
-            'Demikian surat dispensasi ini diterbitkan agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya. Siswa yang bersangkutan tetap berkewajiban menyelesaikan materi serta tugas-tugas pelajaran yang tertinggal.',
+            $closingTextStr,
             ['name' => 'Times New Roman', 'size' => 10.5, 'italic' => true],
             ['alignment' => Jc::BOTH, 'spaceAfter' => 140]
         );
 
-        // 7. STRUKTUR 2 KOLOM TANDA TANGAN
-        // Kolom Kiri: Tanda Tangan 1 (Guru Pembina Lomba - Terisi Otomatis)
-        // Kolom Kanan: Tanda Tangan 2 (Guru Mata Pelajaran / Guru Piket - Dikosongkan)
+        // 6. STRUKTUR TANDA TANGAN RESMI
+        // Row 1: Kolom Kiri (Guru Pembina) & Kolom Kanan (Waka Kesiswaan)
         $sigTable = $section->addTable([
             'alignment' => JcTable::CENTER,
             'cellMargin' => 40,
@@ -246,22 +290,100 @@ class DispensationDocumentService
         $sigTable->addRow();
 
         // Kolom 1: Guru Pembina
-        $city = $school->city ?: 'Tempat';
+        $city = $school->city ?: 'Jombang';
         $appDate = Carbon::parse($dispensation->approved_at ?? now())->translatedFormat('d F Y');
         $cell1 = $sigTable->addCell(3700);
-        $cell1->addText("Ditetapkan di: {$city}\nPada tanggal: {$appDate}", ['name' => 'Times New Roman', 'size' => 9.5, 'color' => '374151'], ['alignment' => Jc::CENTER]);
-        $cell1->addText("Mengetahui,\nGuru Pembina Lomba", ['name' => 'Times New Roman', 'size' => 10, 'bold' => true], ['alignment' => Jc::CENTER]);
+        $cell1->addText("{$city}, {$appDate}", ['name' => 'Times New Roman', 'size' => 9.5, 'color' => '374151'], ['alignment' => Jc::CENTER]);
+        $cell1->addText("Guru Pembina / Pendamping", ['name' => 'Times New Roman', 'size' => 10, 'bold' => true], ['alignment' => Jc::CENTER]);
         $cell1->addTextBreak(3);
         $cell1->addText($dispensation->supervisor_name ?: 'Guru Pembina Lomba', ['name' => 'Times New Roman', 'size' => 10.5, 'bold' => true, 'underline' => 'single'], ['alignment' => Jc::CENTER]);
         $cell1->addText('NIP. - / Pembina Prestasi', ['name' => 'Arial', 'size' => 8.5, 'color' => '4B5563'], ['alignment' => Jc::CENTER]);
 
-        // Kolom 2: Guru Mapel / Guru Piket (Dikosongkan karena jam mengajar dinamis)
+        // Kolom 2: Waka Kesiswaan
+        $config = $school->letter_format_config ?? [];
+        $wakaName = $config['waka_kesiswaan_name'] ?? ($dispensation->approvedBy->name ?? 'Drs. H. Abdul Haris');
+        $wakaNip = $config['waka_kesiswaan_nip'] ?? 'NIP. Sekolah / Pengesahan Resmi';
         $cell2 = $sigTable->addCell(3700);
-        $cell2->addText(" \n ", ['name' => 'Times New Roman', 'size' => 9.5, 'color' => 'FFFFFF'], ['alignment' => Jc::CENTER]);
-        $cell2->addText("Menyetujui / Memaklumi,\nGuru Mata Pelajaran / Guru Piket", ['name' => 'Times New Roman', 'size' => 10, 'bold' => true], ['alignment' => Jc::CENTER]);
+        $cell2->addText("Mengetahui / Menyetujui,", ['name' => 'Times New Roman', 'size' => 9.5, 'color' => '374151'], ['alignment' => Jc::CENTER]);
+        $cell2->addText("Waka Kesiswaan", ['name' => 'Times New Roman', 'size' => 10, 'bold' => true], ['alignment' => Jc::CENTER]);
         $cell2->addTextBreak(3);
-        $cell2->addText('( .................................................... )', ['name' => 'Times New Roman', 'size' => 10.5, 'bold' => true], ['alignment' => Jc::CENTER]);
-        $cell2->addText("NIP. ..............................................\n*(Ditandatangani saat jam KBM di kelas)*", ['name' => 'Arial', 'size' => 8, 'italic' => true, 'color' => '6B7280'], ['alignment' => Jc::CENTER]);
+        $cell2->addText($wakaName, ['name' => 'Times New Roman', 'size' => 10.5, 'bold' => true, 'underline' => 'single'], ['alignment' => Jc::CENTER]);
+        $cell2->addText($wakaNip, ['name' => 'Arial', 'size' => 8.5, 'color' => '4B5563'], ['alignment' => Jc::CENTER]);
+
+        // Row 2: Wali Kelas / Guru Mapel (Dikosongkan untuk tanda tangan basah di kelas)
+        $section->addTextBreak(1);
+        $sigTable2 = $section->addTable([
+            'alignment' => JcTable::CENTER,
+            'cellMargin' => 40,
+        ]);
+        $sigTable2->addRow();
+        $cell3 = $sigTable2->addCell(7400);
+        $cell3->addText("Menyetujui / Memaklumi,\nWali Kelas / Guru Mata Pelajaran", ['name' => 'Times New Roman', 'size' => 10, 'bold' => true], ['alignment' => Jc::CENTER]);
+        $cell3->addTextBreak(3);
+        $cell3->addText('( .................................................... )', ['name' => 'Times New Roman', 'size' => 10.5, 'bold' => true], ['alignment' => Jc::CENTER]);
+        $cell3->addText("NIP. ..............................................\n*(Ditandatangani saat jam KBM di kelas)*", ['name' => 'Arial', 'size' => 8, 'italic' => true, 'color' => '6B7280'], ['alignment' => Jc::CENTER]);
+
+        // 7. LEMBAR 2: LAMPIRAN DAFTAR PESERTA DIDIK (JIKA LEBIH DARI 1 SISWA)
+        if ($studentCount > 1) {
+            $section->addPageBreak();
+
+            // Kop Surat Lembar 2
+            if ($letterheadImagePath && ($school->letterhead_type ?? 'text') === 'image') {
+                $section->addImage($letterheadImagePath, [
+                    'width' => 450,
+                    'alignment' => Jc::CENTER,
+                    'wrappingStyle' => 'inline',
+                ]);
+                $section->addTextBreak(1);
+            } else {
+                $config = $school->letter_format_config ?? [];
+                $govLine = $config['institution_level1'] ?? 'PEMERINTAH DAERAH PROVINSI';
+                $agencyLine = $config['institution_level2'] ?? 'DINAS PENDIDIKAN DAN KEBUDAYAAN';
+
+                $section->addText(strtoupper($govLine), ['name' => 'Times New Roman', 'size' => 11, 'bold' => true], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+                $section->addText(strtoupper($agencyLine), ['name' => 'Times New Roman', 'size' => 12, 'bold' => true], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+                $section->addText(strtoupper($school->name), ['name' => 'Times New Roman', 'size' => 14, 'bold' => true], ['alignment' => Jc::CENTER, 'spaceAfter' => 60]);
+                $section->addLine(['weight' => 2.5, 'width' => 480, 'height' => 0, 'color' => '000000']);
+                $section->addLine(['weight' => 1.0, 'width' => 480, 'height' => 0, 'color' => '000000']);
+                $section->addTextBreak(1);
+            }
+
+            // Judul Lampiran Lembar 2
+            $section->addText('LAMPIRAN DAFTAR PESERTA DIDIK PENERIMA DISPENSASI KBM', [
+                'name' => 'Times New Roman',
+                'size' => 11.5,
+                'bold' => true,
+                'underline' => 'single',
+            ], ['alignment' => Jc::CENTER, 'spaceAfter' => 40]);
+
+            $section->addText('Surat Nomor: ' . $dispensation->reference_number . ' • Agenda: ' . $dispensation->competition_name, [
+                'name' => 'Arial',
+                'size' => 9.5,
+            ], ['alignment' => Jc::CENTER, 'spaceAfter' => 180]);
+
+            // Tabel Lampiran Siswa
+            $tableStyle = [
+                'borderColor' => '4B5563',
+                'borderSize' => 6,
+                'cellMargin' => 80,
+                'alignment' => JcTable::CENTER,
+            ];
+            $phpWord->addTableStyle('StudentTable', $tableStyle);
+            $table2 = $section->addTable('StudentTable');
+            $table2->addRow(350);
+            $table2->addCell(600, ['bgColor' => 'F3F4F6'])->addText('NO', ['name' => 'Arial', 'size' => 9.5, 'bold' => true], ['alignment' => Jc::CENTER]);
+            $table2->addCell(3600, ['bgColor' => 'F3F4F6'])->addText('NAMA PESERTA DIDIK', ['name' => 'Arial', 'size' => 9.5, 'bold' => true]);
+            $table2->addCell(1600, ['bgColor' => 'F3F4F6'])->addText('NIS / NISN', ['name' => 'Arial', 'size' => 9.5, 'bold' => true], ['alignment' => Jc::CENTER]);
+            $table2->addCell(1400, ['bgColor' => 'F3F4F6'])->addText('KELAS', ['name' => 'Arial', 'size' => 9.5, 'bold' => true], ['alignment' => Jc::CENTER]);
+
+            foreach ($dispensation->students as $idx => $student) {
+                $table2->addRow(300);
+                $table2->addCell(600)->addText((string) ($idx + 1), ['name' => 'Arial', 'size' => 9], ['alignment' => Jc::CENTER]);
+                $table2->addCell(3600)->addText(strtoupper($student->full_name), ['name' => 'Arial', 'size' => 9, 'bold' => true]);
+                $table2->addCell(1600)->addText(($student->nis ?? '-') . ' / ' . ($student->nisn ?? '-'), ['name' => 'Arial', 'size' => 9], ['alignment' => Jc::CENTER]);
+                $table2->addCell(1400)->addText($student->class_name ?? '-', ['name' => 'Arial', 'size' => 9, 'bold' => true], ['alignment' => Jc::CENTER]);
+            }
+        }
 
         // Tulis file
         $writer = IOFactory::createWriter($phpWord, 'Word2007');

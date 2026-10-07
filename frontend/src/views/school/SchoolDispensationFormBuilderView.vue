@@ -29,13 +29,24 @@ const optionInputs = ref<Record<string, string>>({})
 
 // Interactive preview testing state
 const previewValues = ref<Record<string, any>>({})
+const viewMode = ref<'editor' | 'preview'>('editor')
 
 async function fetchSchema() {
   loading.value = true
   try {
     const res = await api.get('/school/dispensations/form-schema')
     schoolName.value = res.data.data.school_name || 'Sekolah'
-    schema.value = res.data.data.schema || []
+    const rawSchema = res.data.data.schema || []
+    schema.value = rawSchema.map((f: any, idx: number) => ({
+      id: f.id || `field_${Date.now()}_${idx}`,
+      name: f.name || `field_${idx + 1}`,
+      label: f.label || `Pertanyaan ${idx + 1}`,
+      type: f.type || 'text',
+      placeholder: f.placeholder || '',
+      description: f.description || '',
+      options: Array.isArray(f.options) ? [...f.options] : [],
+      is_required: Boolean(f.is_required),
+    }))
     initPreviewValues()
   } catch (err: any) {
     toast.error('Gagal memuat pengaturan formulir sekolah.', 'Error')
@@ -95,6 +106,19 @@ function removeField(index: number) {
   schema.value.splice(index, 1)
 }
 
+function duplicateField(index: number) {
+  const source = schema.value[index]
+  const newId = `field_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+  const cloned: CustomField = {
+    ...JSON.parse(JSON.stringify(source)),
+    id: newId,
+    label: `${source.label} (Salinan)`,
+    name: `${source.name}_copy`,
+  }
+  schema.value.splice(index + 1, 0, cloned)
+  previewValues.value[cloned.name] = cloned.type === 'checkbox' ? false : ''
+}
+
 function moveField(index: number, direction: 'up' | 'down') {
   if (direction === 'up' && index > 0) {
     const temp = schema.value[index]
@@ -127,6 +151,11 @@ function removeOption(field: CustomField, optIdx: number) {
   if (field.options) {
     field.options.splice(optIdx, 1)
   }
+}
+
+function updateOptionValue(field: CustomField, optIdx: number, val: string) {
+  if (!field.options) field.options = []
+  field.options[optIdx] = val
 }
 
 // Presets
@@ -293,6 +322,10 @@ const letterConfig = ref({
   document_title: 'SURAT KETERANGAN DISPENSASI BELAJAR (KBM)',
   reference_number_prefix: '421.3/DISP-KBM',
   closing_text: 'Demikian surat dispensasi ini dibuat agar Bapak/Ibu Guru Mata Pelajaran dan Guru Piket dapat memakluminya. Siswa tetap berkewajiban menyelesaikan materi pelajaran serta tugas-tugas yang tertinggal.',
+  header_width_mode: 'contained',
+  header_max_height: 130,
+  header_alignment: 'center',
+  header_margin_bottom: 10,
 })
 
 async function fetchLetterTemplate() {
@@ -337,11 +370,45 @@ function handleRemoveLetterhead() {
   letterheadType.value = 'text'
 }
 
+const parsingDocx = ref(false)
+
 function handleDocxChange(e: Event) {
   const target = e.target as HTMLInputElement
   if (target.files && target.files[0]) {
     docxTemplateFile.value = target.files[0]
     removeDocxTemplate.value = false
+  }
+}
+
+async function autoGenerateFromDocx() {
+  if (!docxTemplateFile.value) {
+    toast.error('Mohon pilih file template .docx terlebih dahulu.', 'Pilih File')
+    return
+  }
+
+  parsingDocx.value = true
+  try {
+    const formData = new FormData()
+    formData.append('docx_file', docxTemplateFile.value)
+
+    const res = await api.post('/school/dispensations/parse-docx-schema', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+
+    const extracted = res.data.data.extracted_schema || []
+    if (extracted.length === 0) {
+      toast.info('Tidak ditemukan variabel baru pada file DOCX.', 'Informasi')
+      return
+    }
+
+    schema.value = extracted
+    initPreviewValues()
+    activeTab.value = 'schema'
+    toast.success(`Berhasil memindai file. ${extracted.length} kolom formulir dinamis dibuat secara otomatis!`, 'Form Terbuat Otomatis')
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal memindai file template DOCX.')
+  } finally {
+    parsingDocx.value = false
   }
 }
 
@@ -374,6 +441,10 @@ async function saveLetterTemplate() {
     formData.append('document_title', letterConfig.value.document_title)
     formData.append('reference_number_prefix', letterConfig.value.reference_number_prefix)
     formData.append('closing_text', letterConfig.value.closing_text)
+    formData.append('header_width_mode', letterConfig.value.header_width_mode || 'contained')
+    formData.append('header_max_height', String(letterConfig.value.header_max_height || 130))
+    formData.append('header_alignment', letterConfig.value.header_alignment || 'center')
+    formData.append('header_margin_bottom', String(letterConfig.value.header_margin_bottom || 10))
 
     await api.post('/school/dispensations/letter-template', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -483,169 +554,302 @@ onMounted(() => {
         </button>
       </div>
 
-      <!-- TAB 1: FORM SCHEMA BUILDER -->
-      <div v-if="activeTab === 'schema'" class="space-y-6">
-        <!-- Quick Preset Template Banner -->
-        <div class="bg-linear-to-r from-blue-900 to-indigo-950 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-blue-800/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div class="space-y-1 max-w-xl">
-          <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-brand-gold text-[10px] font-bold uppercase tracking-wider">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <span>Template Cepat Instansi</span>
+      <!-- TAB 1: FORM SCHEMA BUILDER (GOOGLE FORMS AESTHETIC) -->
+      <div v-if="activeTab === 'schema'" class="max-w-4xl mx-auto space-y-5">
+        <!-- Google Forms Top Header Card -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+          <div class="h-2.5 bg-linear-to-r from-brand-navy via-blue-800 to-indigo-900"></div>
+          <div class="p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 class="text-xl font-extrabold text-slate-900 tracking-tight">Formulir Dispensasi KBM - {{ schoolName }}</h2>
+                <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Susun pertanyaan dan kolom dinamis yang wajib diisi oleh siswa saat membuat pengajuan dispensasi KBM.
+                </p>
+              </div>
+
+              <!-- Top Action & View Switcher -->
+              <div class="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  @click="viewMode = viewMode === 'editor' ? 'preview' : 'editor'"
+                  :class="[
+                    'px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border',
+                    viewMode === 'preview'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                  ]"
+                >
+                  <i :class="viewMode === 'preview' ? 'fa-solid fa-pen-to-square text-emerald-600' : 'fa-solid fa-eye text-brand-blue'"></i>
+                  <span>{{ viewMode === 'preview' ? 'Kembali ke Editor' : 'Pratinjau Form Siswa' }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  @click="saveSchema"
+                  :disabled="saving"
+                  class="px-5 py-2.5 bg-brand-navy hover:bg-[#001442] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  <i v-if="saving" class="fa-solid fa-spinner fa-spin"></i>
+                  <i v-else class="fa-solid fa-floppy-disk text-brand-gold"></i>
+                  <span>Simpan Formulir</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Editor vs Preview View Mode Tabs & Preset Bar -->
+            <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  @click="viewMode = 'editor'"
+                  :class="[
+                    'px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5',
+                    viewMode === 'editor' ? 'bg-white text-brand-navy shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  ]"
+                >
+                  <i class="fa-solid fa-sliders text-brand-blue"></i>
+                  <span>1. Desain Pertanyaan (Editor)</span>
+                </button>
+                <button
+                  type="button"
+                  @click="viewMode = 'preview'"
+                  :class="[
+                    'px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5',
+                    viewMode === 'preview' ? 'bg-white text-brand-navy shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  ]"
+                >
+                  <i class="fa-solid fa-eye text-emerald-600"></i>
+                  <span>2. Pratinjau Tampilan Siswa</span>
+                </button>
+              </div>
+
+              <div v-if="viewMode === 'editor'" class="flex items-center gap-1.5">
+                <span class="font-bold text-slate-500 text-[11px]">Preset Instan:</span>
+                <button
+                  type="button"
+                  @click="applyPreset('sma')"
+                  class="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-brand-navy font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <i class="fa-solid fa-graduation-cap text-blue-600"></i>
+                  <span>SMA</span>
+                </button>
+                <button
+                  type="button"
+                  @click="applyPreset('smk')"
+                  class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <i class="fa-solid fa-gear text-amber-600"></i>
+                  <span>SMK</span>
+                </button>
+                <button
+                  type="button"
+                  @click="applyPreset('ma')"
+                  class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <i class="fa-solid fa-mosque text-emerald-600"></i>
+                  <span>MA</span>
+                </button>
+              </div>
+            </div>
           </div>
-          <h3 class="text-sm sm:text-base font-bold text-white">Gunakan Template Rekomendasi Sesuai Jenjang</h3>
-          <p class="text-xs text-blue-200/80 leading-relaxed">
-            Ingin setup instan? Terapkan skema kolom baku yang sering digunakan untuk jenjang SMA Umum, SMK Vokasi, atau Madrasah Aliyah.
-          </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            @click="applyPreset('sma')"
-            class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-white border border-white/15 transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <i class="fa-solid fa-graduation-cap text-sky-400"></i>
-            <span>Preset SMA (Umum)</span>
-          </button>
-          <button
-            type="button"
-            @click="applyPreset('smk')"
-            class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-white border border-white/15 transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <i class="fa-solid fa-wrench text-amber-400"></i>
-            <span>Preset SMK (Kejuruan)</span>
-          </button>
-          <button
-            type="button"
-            @click="applyPreset('ma')"
-            class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-white border border-white/15 transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <i class="fa-solid fa-mosque text-emerald-400"></i>
-            <span>Preset MA (Madrasah)</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Main Dual-Column Workspace: Left Form Editor, Right Live Preview -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <!-- LEFT: Field Configuration List (7 cols) -->
-        <div class="lg:col-span-7 space-y-4">
-          <!-- Permanent Core Fields Card (Read-only reference) -->
-          <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 text-xs">
-            <div class="flex items-center justify-between mb-2">
-              <span class="font-bold text-slate-700 flex items-center gap-1.5">
-                <i class="fa-solid fa-lock text-slate-400"></i>
-                <span>Kolom Wajib Baku (Standar Semua Sekolah)</span>
-              </span>
-              <span class="text-[10px] text-slate-400">Permanen</span>
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-              <span class="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-[11px] text-slate-600 font-medium">1. Nama Lomba / Kegiatan</span>
-              <span class="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-[11px] text-slate-600 font-medium">2. Jenis Izin (Persiapan / Pelaksanaan)</span>
-              <span class="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-[11px] text-slate-600 font-medium">3. Siswa yang Diberi Izin</span>
-              <span class="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-[11px] text-slate-600 font-medium">4. Rentang Tanggal Izin</span>
-              <span class="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-[11px] text-slate-600 font-medium">5. Uraian / Tujuan</span>
-              <span class="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-[11px] text-slate-600 font-medium">6. Guru Pendamping</span>
-            </div>
-          </div>
-
-          <!-- Add Field Action Buttons Bar -->
-          <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h4 class="text-xs font-extrabold uppercase tracking-wider text-brand-navy">Kolom Kustom Sekolah</h4>
-              <p class="text-[11px] text-slate-500">Pilih tipe input untuk menambah kolom baru:</p>
+        <!-- MODE 1: QUESTION CARDS EDITOR -->
+        <div v-if="viewMode === 'editor'" class="space-y-4">
+          <!-- Google Forms Action Bar (+ Tambah Pertanyaan) -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 sticky top-4 z-10">
+            <div class="flex items-center gap-2 font-bold text-xs text-brand-navy">
+              <i class="fa-solid fa-circle-plus text-base text-brand-blue"></i>
+              <span>Tambah Pertanyaan Baru</span>
             </div>
             <div class="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 @click="addField('text')"
-                class="px-2.5 py-1.5 bg-slate-50 hover:bg-blue-50 text-brand-navy rounded-lg border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
-                title="Teks Singkat"
+                class="px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-brand-navy rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <i class="fa-solid fa-font text-blue-600 mr-1"></i> Teks
+                <i class="fa-solid fa-font text-blue-600"></i> Teks Singkat
               </button>
               <button
                 type="button"
                 @click="addField('select')"
-                class="px-2.5 py-1.5 bg-slate-50 hover:bg-emerald-50 text-emerald-900 rounded-lg border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
-                title="Pilihan Dropdown"
+                class="px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <i class="fa-solid fa-list text-emerald-600 mr-1"></i> Pilihan
+                <i class="fa-regular fa-circle-dot text-emerald-600"></i> Pilihan Ganda
               </button>
               <button
                 type="button"
                 @click="addField('checkbox')"
-                class="px-2.5 py-1.5 bg-slate-50 hover:bg-purple-50 text-purple-900 rounded-lg border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
-                title="Kotak Centang"
+                class="px-3 py-1.5 bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <i class="fa-solid fa-square-check text-purple-600 mr-1"></i> Centang
+                <i class="fa-regular fa-square-check text-purple-600"></i> Centang
               </button>
               <button
                 type="button"
                 @click="addField('number')"
-                class="px-2.5 py-1.5 bg-slate-50 hover:bg-amber-50 text-amber-900 rounded-lg border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
-                title="Angka"
+                class="px-3 py-1.5 bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <i class="fa-solid fa-hashtag text-amber-600 mr-1"></i> Angka
+                <i class="fa-solid fa-hashtag text-amber-600"></i> Angka
               </button>
               <button
                 type="button"
                 @click="addField('textarea')"
-                class="px-2.5 py-1.5 bg-slate-50 hover:bg-indigo-50 text-indigo-900 rounded-lg border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
-                title="Paragraf"
+                class="px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <i class="fa-solid fa-paragraph text-indigo-600 mr-1"></i> Paragraf
+                <i class="fa-solid fa-paragraph text-indigo-600"></i> Paragraf
               </button>
             </div>
           </div>
 
-          <!-- Dynamic Field Cards List -->
+          <!-- Loading State -->
           <div v-if="loading" class="p-8 text-center bg-white rounded-2xl border border-slate-200">
             <i class="fa-solid fa-spinner fa-spin text-2xl text-brand-navy"></i>
-            <p class="text-xs text-slate-500 mt-2">Memuat konfigurasi formulir sekolah...</p>
+            <p class="text-xs text-slate-500 mt-2">Memuat formulir sekolah...</p>
           </div>
 
+          <!-- Empty State -->
           <div v-else-if="schema.length === 0" class="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-300 space-y-3">
             <div class="w-12 h-12 rounded-full bg-blue-50 text-brand-blue flex items-center justify-center text-xl mx-auto">
-              <i class="fa-solid fa-sliders"></i>
+              <i class="fa-solid fa-file-circle-plus"></i>
             </div>
-            <h4 class="text-sm font-bold text-slate-800">Belum Ada Kolom Tambahan Khusus</h4>
+            <h4 class="text-sm font-bold text-slate-800">Formulir Masih Kosong</h4>
             <p class="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-              Sekolah Anda saat ini hanya menggunakan kolom baku standar. Klik tombol tipe kolom di atas atau terapkan preset untuk menambah kolom formulir.
+              Klik tombol tipe pertanyaan di atas untuk menambah pertanyaan baru pada formulir dispensasi.
             </p>
           </div>
 
-          <div v-else class="space-y-3">
+          <!-- Google Forms Question Cards Stack -->
+          <div v-else class="space-y-4">
             <div
               v-for="(field, fIdx) in schema"
               :key="field.id"
-              class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4 transition-all"
+              class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs border-l-4 border-l-brand-navy transition-all space-y-4"
             >
-              <!-- Field Card Header -->
-              <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">
-                    {{ fIdx + 1 }}
-                  </span>
-                  <span class="text-xs font-bold text-slate-900 truncate">
-                    {{ field.label || 'Kolom Baru' }}
-                  </span>
-                  <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold uppercase">
-                    {{ field.type }}
-                  </span>
-                  <span v-if="field.is_required" class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold">
-                    Wajib
+              <!-- Drag Grip & Card Index Header -->
+              <div class="flex items-center justify-between text-slate-400">
+                <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-grip-lines text-slate-300 text-xs cursor-grab"></i>
+                  <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Pertanyaan {{ fIdx + 1 }}
                   </span>
                 </div>
+                <span class="text-[10px] font-mono text-slate-400">ID: {{ field.name }}</span>
+              </div>
 
-                <!-- Move & Delete Controls -->
-                <div class="flex items-center gap-1 shrink-0">
+              <!-- Google Forms Top Row: Title Input & Type Dropdown -->
+              <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <input
+                  type="text"
+                  v-model="field.label"
+                  @input="onLabelChange(field)"
+                  placeholder="Judul Pertanyaan / Kolom"
+                  class="flex-1 w-full text-sm sm:text-base font-semibold text-slate-900 bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:border-brand-navy focus:ring-2 focus:ring-blue-100 focus:outline-hidden transition-all"
+                />
+
+                <!-- Type Dropdown -->
+                <select
+                  v-model="field.type"
+                  class="w-full sm:w-48 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:border-brand-navy focus:bg-white cursor-pointer"
+                >
+                  <option value="text">Teks Singkat</option>
+                  <option value="textarea">Paragraf Panjang</option>
+                  <option value="select">Pilihan Ganda</option>
+                  <option value="number">Angka / Nilai</option>
+                  <option value="checkbox">Kotak Centang</option>
+                  <option value="date">Tanggal</option>
+                </select>
+              </div>
+
+              <!-- Google Forms Description / Helper Text Row -->
+              <div>
+                <input
+                  type="text"
+                  v-model="field.description"
+                  placeholder="Deskripsi atau petunjuk pertanyaan (opsional)..."
+                  class="w-full text-xs text-slate-600 bg-slate-50/50 border border-slate-200/70 rounded-xl px-3 py-2 focus:bg-white focus:border-brand-navy focus:outline-hidden"
+                />
+              </div>
+
+              <!-- Google Forms Pilihan Ganda (Select Options Editor) -->
+              <div v-if="field.type === 'select'" class="space-y-2 pt-2">
+                <p class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Opsi Pilihan Ganda:</p>
+
+                <div
+                  v-for="(opt, oIdx) in (field.options || [])"
+                  :key="oIdx"
+                  class="flex items-center gap-3"
+                >
+                  <i class="fa-regular fa-circle text-slate-400 text-sm"></i>
+                  <input
+                    type="text"
+                    :value="opt"
+                    @input="e => updateOptionValue(field, oIdx, (e.target as HTMLInputElement).value)"
+                    placeholder="Nama Opsi"
+                    class="flex-1 text-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-brand-navy focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    @click="removeOption(field, oIdx)"
+                    class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                    title="Hapus Opsi"
+                  >
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                  </button>
+                </div>
+
+                <!-- Add Option Button Row -->
+                <div class="flex items-center gap-3 pt-1">
+                  <i class="fa-regular fa-circle text-slate-300 text-sm"></i>
+                  <input
+                    type="text"
+                    v-model="optionInputs[field.id]"
+                    @keydown.enter.prevent="addOption(field)"
+                    placeholder="Ketik opsi baru lalu tekan Enter atau klik Tambah..."
+                    class="flex-1 text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:border-brand-navy focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    @click="addOption(field)"
+                    class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                  >
+                    + Tambah
+                  </button>
+                </div>
+              </div>
+
+              <!-- Google Forms Bottom Card Action Toolbar -->
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-3 text-slate-500">
+                <!-- Duplicate Card Button -->
+                <button
+                  type="button"
+                  @click="duplicateField(fIdx)"
+                  class="p-2 text-slate-500 hover:text-brand-navy hover:bg-slate-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                  title="Duplikat Pertanyaan Ini"
+                >
+                  <i class="fa-solid fa-clone"></i>
+                  <span class="hidden sm:inline">Duplikat</span>
+                </button>
+
+                <!-- Delete Card Button -->
+                <button
+                  type="button"
+                  @click="removeField(fIdx)"
+                  class="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                  title="Hapus Pertanyaan Ini"
+                >
+                  <i class="fa-regular fa-trash-can"></i>
+                  <span class="hidden sm:inline">Hapus</span>
+                </button>
+
+                <!-- Move Up / Down -->
+                <div class="flex items-center gap-1">
                   <button
                     type="button"
                     @click="moveField(fIdx, 'up')"
                     :disabled="fIdx === 0"
                     class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md disabled:opacity-30 cursor-pointer"
-                    title="Pindahkan Ke Atas"
+                    title="Geser Ke Atas"
                   >
                     <i class="fa-solid fa-arrow-up text-xs"></i>
                   </button>
@@ -654,266 +858,157 @@ onMounted(() => {
                     @click="moveField(fIdx, 'down')"
                     :disabled="fIdx === schema.length - 1"
                     class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md disabled:opacity-30 cursor-pointer"
-                    title="Pindahkan Ke Bawah"
+                    title="Geser Ke Bawah"
                   >
                     <i class="fa-solid fa-arrow-down text-xs"></i>
                   </button>
-                  <button
-                    type="button"
-                    @click="removeField(fIdx)"
-                    class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md cursor-pointer ml-1"
-                    title="Hapus Kolom"
-                  >
-                    <i class="fa-solid fa-trash-can text-xs"></i>
-                  </button>
                 </div>
+
+                <!-- Vertical Divider -->
+                <div class="w-px h-5 bg-slate-200 mx-1"></div>
+
+                <!-- Google Forms Required Switch Toggle -->
+                <label class="relative inline-flex items-center gap-2 cursor-pointer select-none shrink-0">
+                  <span class="text-xs font-semibold text-slate-700">Wajib diisi</span>
+                  <div class="relative inline-block w-9 h-5 align-middle">
+                    <input type="checkbox" v-model="field.is_required" class="sr-only peer" />
+                    <div class="w-9 h-5 bg-slate-200 rounded-full peer-checked:bg-brand-navy transition-colors"></div>
+                    <div class="absolute top-[2px] left-[2px] bg-white border border-slate-300 rounded-full h-4 w-4 transition-transform peer-checked:translate-x-4 peer-checked:border-white pointer-events-none"></div>
+                  </div>
+                </label>
               </div>
 
-              <!-- Field Settings Form -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <!-- Label -->
-                <div class="space-y-1">
-                  <label class="font-bold text-slate-700">Label Kolom (Judul di Form) *</label>
-                  <input
-                    type="text"
-                    v-model="field.label"
-                    @input="onLabelChange(field)"
-                    placeholder="Contoh: Lokasi Karantina"
-                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-navy focus:bg-white"
-                  />
-                </div>
-
-                <!-- Input Type -->
-                <div class="space-y-1">
-                  <label class="font-bold text-slate-700">Tipe Masukan Data *</label>
-                  <select
-                    v-model="field.type"
-                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-navy focus:bg-white"
-                  >
-                    <option value="text">Teks Singkat (Text)</option>
-                    <option value="textarea">Paragraf Panjang (Textarea)</option>
-                    <option value="select">Pilihan Dropdown (Select)</option>
-                    <option value="number">Angka / Jam (Number)</option>
-                    <option value="checkbox">Kotak Centang Persetujuan (Checkbox)</option>
-                    <option value="date">Tanggal Tambahan (Date)</option>
-                  </select>
-                </div>
-
-                <!-- Placeholder (if applicable) -->
-                <div v-if="field.type !== 'checkbox' && field.type !== 'date'" class="space-y-1">
-                  <label class="font-medium text-slate-600">Placeholder (Petunjuk Isi)</label>
-                  <input
-                    type="text"
-                    v-model="field.placeholder"
-                    placeholder="Contoh: Tuliskan nama ruangan..."
-                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-navy focus:bg-white"
-                  />
-                </div>
-
-                <!-- Variable Key / Name (slug) -->
-                <div class="space-y-1">
-                  <label class="font-medium text-slate-600">Kode Kunci Sistem</label>
-                  <input
-                    type="text"
-                    v-model="field.name"
-                    placeholder="contoh_kunci"
-                    class="w-full px-3 py-2 bg-slate-100 font-mono text-[11px] text-slate-600 border border-slate-200 rounded-xl focus:outline-hidden"
-                  />
-                </div>
-
-                <!-- Description / Helper -->
-                <div class="sm:col-span-2 space-y-1">
-                  <label class="font-medium text-slate-600">Keterangan Tambahan untuk Pemohon (Opsional)</label>
-                  <input
-                    type="text"
-                    v-model="field.description"
-                    placeholder="Contoh: Pastikan berkoordinasi dengan pengelola ruangan..."
-                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-navy focus:bg-white"
-                  />
-                </div>
-
-                <!-- Options Editor (for select dropdown type) -->
-                <div v-if="field.type === 'select'" class="sm:col-span-2 p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
-                  <label class="font-bold text-brand-navy block">Daftar Pilihan Dropdown:</label>
-                  <div class="flex flex-wrap gap-1.5 mb-2">
-                    <span
-                      v-for="(opt, oIdx) in (field.options || [])"
-                      :key="oIdx"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-blue-200 rounded-lg text-xs font-semibold text-slate-700"
-                    >
-                      <span>{{ opt }}</span>
-                      <button
-                        type="button"
-                        @click="removeOption(field, oIdx)"
-                        class="text-slate-400 hover:text-rose-600 cursor-pointer"
-                      >
-                        <i class="fa-solid fa-xmark text-xs"></i>
-                      </button>
-                    </span>
-                  </div>
-
-                  <div class="flex gap-2">
+              <!-- Advanced Settings Details (Placeholder & Name) -->
+              <details class="text-[11px] text-slate-500 pt-1">
+                <summary class="cursor-pointer hover:text-brand-navy font-semibold flex items-center gap-1">
+                  <i class="fa-solid fa-gear text-slate-400"></i>
+                  <span>Pengaturan Lanjutan (Placeholder & Kode Sistem)</span>
+                </summary>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Placeholder</label>
                     <input
                       type="text"
-                      v-model="optionInputs[field.id]"
-                      @keydown.enter.prevent="addOption(field)"
-                      placeholder="Ketik opsi pilihan lalu klik Tambah..."
-                      class="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-hidden focus:border-brand-navy"
+                      v-model="field.placeholder"
+                      placeholder="Petunjuk isian..."
+                      class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                     />
-                    <button
-                      type="button"
-                      @click="addOption(field)"
-                      class="px-3 py-1.5 bg-brand-navy text-white text-xs font-bold rounded-lg hover:bg-[#001442] cursor-pointer"
-                    >
-                      Tambah Opsi
-                    </button>
                   </div>
-                </div>
-
-                <!-- Required Toggle Switch -->
-                <div class="sm:col-span-2 pt-2 flex items-center justify-between border-t border-slate-100">
                   <div>
-                    <p class="font-bold text-slate-800">Apakah Kolom Ini Wajib Diisi?</p>
-                    <p class="text-[11px] text-slate-400">Jika wajib, pemohon tidak bisa menyimpan formulir jika belum mengisi kolom ini.</p>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Kode Kunci Variable (Word/DB)</label>
+                    <input
+                      type="text"
+                      v-model="field.name"
+                      placeholder="kode_variabel"
+                      class="w-full px-2.5 py-1.5 bg-slate-100 font-mono text-[11px] text-slate-700 border border-slate-200 rounded-lg"
+                    />
                   </div>
-                  <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" v-model="field.is_required" class="sr-only peer" />
-                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
                 </div>
-              </div>
+              </details>
             </div>
           </div>
         </div>
 
-        <!-- RIGHT: Live Interactive Preview (5 cols) -->
-        <div class="lg:col-span-5 sticky top-6 space-y-4">
-          <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-lg space-y-5">
+        <!-- MODE 2: LIVE STUDENT FORM PREVIEW -->
+        <div v-else-if="viewMode === 'preview'" class="space-y-4">
+          <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
               <div class="flex items-center gap-2">
                 <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
-                <h3 class="text-xs font-extrabold uppercase tracking-wider text-brand-navy">Pratinjau Langsung Formulir</h3>
+                <h3 class="text-sm font-bold text-slate-900">Simulasi Tampilan Pengisian Formulir Siswa</h3>
               </div>
-              <span class="text-[10px] text-slate-400 font-mono">Tampilan Pengguna</span>
+              <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                Tampilan Responsif
+              </span>
             </div>
 
-            <p class="text-[11px] text-slate-500 leading-relaxed">
-              Berikut simulasi bagaimana kolom kustom di atas akan terlihat saat Admin menerbitkan dispensasi atau Siswa mengajukan izin:
-            </p>
+            <!-- Student Form Field Simulations Stack -->
+            <div v-if="schema.length === 0" class="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-2">
+              <i class="fa-solid fa-file-circle-question text-slate-400 text-2xl"></i>
+              <h4 class="text-xs font-bold text-slate-700">Formulir Masih Kosong</h4>
+              <p class="text-[11px] text-slate-500">Tambahkan pertanyaan pada editor untuk melihat simulasi tampilan formulir siswa.</p>
+            </div>
 
-            <!-- Mock Form -->
-            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4 text-xs">
-              <!-- Mock Permanent Core Field -->
-              <div class="space-y-1 opacity-70">
-                <label class="font-bold text-slate-600">Nama Lomba / Kegiatan *</label>
+            <div v-else class="space-y-4 text-xs">
+              <!-- Custom Dynamic Fields Preview Cards (100% Configurable) -->
+              <div
+                v-for="(field, fIdx) in schema"
+                :key="field.id"
+                class="p-4 bg-slate-50/60 rounded-xl border border-slate-200/80 space-y-2"
+              >
+                <label class="font-bold text-slate-800 flex items-center justify-between">
+                  <span>
+                    {{ fIdx + 1 }}. {{ field.label }}
+                    <span v-if="field.is_required" class="text-rose-500">*</span>
+                  </span>
+                  <span v-if="!field.is_required" class="text-[10px] text-slate-400 font-normal">(Opsional)</span>
+                </label>
+
+                <p v-if="field.description" class="text-[11px] text-slate-500 leading-normal">
+                  {{ field.description }}
+                </p>
+
+                <!-- Text -->
                 <input
+                  v-if="field.type === 'text'"
                   type="text"
-                  disabled
-                  value="Olimpiade Sains Nasional (OSN) 2026"
-                  class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed"
+                  v-model="previewValues[field.name]"
+                  :placeholder="field.placeholder || 'Isikan teks...'"
+                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-brand-navy"
+                />
+
+                <!-- Textarea -->
+                <textarea
+                  v-else-if="field.type === 'textarea'"
+                  rows="3"
+                  v-model="previewValues[field.name]"
+                  :placeholder="field.placeholder || 'Tuliskan rincian...'"
+                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-brand-navy"
+                ></textarea>
+
+                <!-- Select -->
+                <select
+                  v-else-if="field.type === 'select'"
+                  v-model="previewValues[field.name]"
+                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-brand-navy cursor-pointer"
+                >
+                  <option value="">-- Pilih {{ field.label }} --</option>
+                  <option v-for="(opt, oIdx) in (field.options || [])" :key="oIdx" :value="opt">
+                    {{ opt }}
+                  </option>
+                </select>
+
+                <!-- Checkbox -->
+                <label v-else-if="field.type === 'checkbox'" class="flex items-start gap-2.5 pt-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    v-model="previewValues[field.name]"
+                    class="mt-0.5 rounded border-slate-300 text-brand-navy focus:ring-brand-navy"
+                  />
+                  <span class="text-slate-700 leading-snug">{{ field.label }}</span>
+                </label>
+
+                <!-- Number -->
+                <input
+                  v-else-if="field.type === 'number'"
+                  type="number"
+                  v-model="previewValues[field.name]"
+                  :placeholder="field.placeholder || '0'"
+                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-brand-navy"
+                />
+
+                <!-- Date -->
+                <input
+                  v-else-if="field.type === 'date'"
+                  type="date"
+                  v-model="previewValues[field.name]"
+                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-brand-navy"
                 />
               </div>
-
-              <!-- Dynamic Custom Fields Preview -->
-              <div v-if="schema.length > 0" class="pt-3 border-t border-blue-200/60 space-y-3.5">
-                <div class="flex items-center gap-1.5 text-brand-navy font-black text-xs">
-                  <i class="fa-solid fa-sparkles text-brand-gold"></i>
-                  <span>Kolom Khusus {{ schoolName }}</span>
-                </div>
-
-                <div v-for="field in schema" :key="field.id" class="space-y-1">
-                  <label class="font-bold text-slate-800 flex items-center justify-between">
-                    <span>
-                      {{ field.label }}
-                      <span v-if="field.is_required" class="text-rose-500">*</span>
-                    </span>
-                    <span v-if="!field.is_required" class="text-[10px] text-slate-400 font-normal">(Opsional)</span>
-                  </label>
-
-                  <!-- Text Input -->
-                  <input
-                    v-if="field.type === 'text'"
-                    type="text"
-                    v-model="previewValues[field.name]"
-                    :placeholder="field.placeholder || 'Isikan teks...'"
-                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-brand-navy"
-                  />
-
-                  <!-- Textarea -->
-                  <textarea
-                    v-else-if="field.type === 'textarea'"
-                    rows="2"
-                    v-model="previewValues[field.name]"
-                    :placeholder="field.placeholder || 'Tuliskan rincian...'"
-                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-brand-navy"
-                  ></textarea>
-
-                  <!-- Select Dropdown -->
-                  <select
-                    v-else-if="field.type === 'select'"
-                    v-model="previewValues[field.name]"
-                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-brand-navy"
-                  >
-                    <option value="">-- Pilih {{ field.label }} --</option>
-                    <option v-for="(opt, oIdx) in (field.options || [])" :key="oIdx" :value="opt">
-                      {{ opt }}
-                    </option>
-                  </select>
-
-                  <!-- Number -->
-                  <input
-                    v-else-if="field.type === 'number'"
-                    type="number"
-                    v-model.number="previewValues[field.name]"
-                    :placeholder="field.placeholder || '0'"
-                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-brand-navy"
-                  />
-
-                  <!-- Date -->
-                  <input
-                    v-else-if="field.type === 'date'"
-                    type="date"
-                    v-model="previewValues[field.name]"
-                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-brand-navy"
-                  />
-
-                  <!-- Checkbox -->
-                  <label v-else-if="field.type === 'checkbox'" class="flex items-start gap-2 pt-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      v-model="previewValues[field.name]"
-                      class="mt-0.5 rounded border-slate-300 text-brand-navy focus:ring-brand-navy"
-                    />
-                    <span class="text-slate-700 leading-snug">{{ field.label }}</span>
-                  </label>
-
-                  <p v-if="field.description" class="text-[10px] text-slate-400 italic">
-                    {{ field.description }}
-                  </p>
-                </div>
-              </div>
-
-              <div v-else class="text-center py-4 text-slate-400 text-xs italic">
-                (Belum ada kolom kustom yang ditambahkan)
-              </div>
-            </div>
-
-            <!-- Footer status in preview card -->
-            <div class="pt-2 flex justify-between items-center text-[11px] text-slate-400">
-              <span>Total: <strong>{{ schema.length }}</strong> kolom kustom</span>
-              <button
-                type="button"
-                @click="saveSchema"
-                :disabled="saving"
-                class="text-brand-navy hover:underline font-bold cursor-pointer"
-              >
-                Simpan Konfigurasi &rarr;
-              </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
       <!-- TAB 2: LETTERHEAD & OFFICIAL DOCUMENT TEMPLATE (KOP, DOCX & PDF) -->
       <div v-else-if="activeTab === 'template'" class="space-y-6">
@@ -1049,6 +1144,100 @@ onMounted(() => {
                   <p class="text-[11px] text-slate-400 mt-1">
                     Format: PNG, JPG, atau WebP (Maks. 5 MB). Disarankan menggunakan gambar berlatar transparan atau putih dengan resolusi tajam (lebar ideal 1000 - 1400 px).
                   </p>
+                </div>
+
+                <!-- Penyesuaian Presisi & Ukuran Kop (Kop Adjustment) -->
+                <div class="p-4 bg-blue-50/60 rounded-xl border border-blue-200/90 space-y-4">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-brand-navy flex items-center gap-1.5">
+                      <i class="fa-solid fa-sliders text-brand-blue"></i>
+                      <span>Penyesuaian Ukuran & Presisi Kop (Kop Adjustment)</span>
+                    </h4>
+                    <span class="text-[10px] font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">Fit Kertas A4</span>
+                  </div>
+
+                  <!-- 1. Mode Fit Lebar -->
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Model Skala Lebar Kop Surat</label>
+                    <div class="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        @click="letterConfig.header_width_mode = 'contained'"
+                        :class="[
+                          'p-2.5 rounded-xl border text-left text-xs font-medium transition-all cursor-pointer flex items-center gap-2',
+                          letterConfig.header_width_mode === 'contained' || !letterConfig.header_width_mode
+                            ? 'border-brand-navy bg-white text-brand-navy font-bold shadow-2xs'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
+                        ]"
+                      >
+                        <i class="fa-solid fa-expand text-brand-blue"></i>
+                        <div>
+                          <p class="leading-tight">Proporsional (Auto Fit)</p>
+                          <p class="text-[9.5px] text-slate-400 font-normal">Sesuai rasio asli gambar</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        @click="letterConfig.header_width_mode = 'full'"
+                        :class="[
+                          'p-2.5 rounded-xl border text-left text-xs font-medium transition-all cursor-pointer flex items-center gap-2',
+                          letterConfig.header_width_mode === 'full'
+                            ? 'border-brand-navy bg-white text-brand-navy font-bold shadow-2xs'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
+                        ]"
+                      >
+                        <i class="fa-solid fa-arrows-left-right text-emerald-600"></i>
+                        <div>
+                          <p class="leading-tight">Pas Lebar Kertas (100%)</p>
+                          <p class="text-[9.5px] text-slate-400 font-normal">Mentok batas margin A4</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 2. Batas Tinggi Maksimal & Alignment & Margin Bottom -->
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div v-if="letterConfig.header_width_mode !== 'full'">
+                      <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                        Tinggi Maksimal: <span class="text-brand-navy font-mono">{{ letterConfig.header_max_height || 130 }}px</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="50"
+                        max="250"
+                        step="5"
+                        v-model.number="letterConfig.header_max_height"
+                        class="w-full accent-brand-navy cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="block text-[11px] font-bold text-slate-700 mb-1">Posisi / Alignment</label>
+                      <select
+                        v-model="letterConfig.header_alignment"
+                        class="w-full rounded-lg border border-slate-300 p-1.5 text-xs bg-white text-slate-800 font-medium focus:border-brand-navy focus:outline-hidden"
+                      >
+                        <option value="center">Tengah (Center)</option>
+                        <option value="left">Kiri (Left)</option>
+                        <option value="right">Kanan (Right)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                        Margin Bawah: <span class="text-brand-navy font-mono">{{ letterConfig.header_margin_bottom || 10 }}px</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="40"
+                        step="2"
+                        v-model.number="letterConfig.header_margin_bottom"
+                        class="w-full accent-brand-navy cursor-pointer"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1191,12 +1380,25 @@ onMounted(() => {
                 <label class="block text-xs font-bold text-slate-700 mb-1">
                   {{ hasCustomDocx ? 'Ganti File Template DOCX' : 'Unggah File Template DOCX Kustom' }}
                 </label>
-                <input
-                  type="file"
-                  accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  @change="handleDocxChange"
-                  class="w-full text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-700 file:text-white hover:file:bg-blue-800 cursor-pointer text-xs"
-                />
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="file"
+                    accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    @change="handleDocxChange"
+                    class="w-full text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-700 file:text-white hover:file:bg-blue-800 cursor-pointer text-xs"
+                  />
+                  <button
+                    v-if="docxTemplateFile"
+                    type="button"
+                    @click="autoGenerateFromDocx"
+                    :disabled="parsingDocx"
+                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                  >
+                    <i v-if="parsingDocx" class="fa-solid fa-spinner fa-spin text-xs"></i>
+                    <i v-else class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                    <span>Generate Form Dinamis</span>
+                  </button>
+                </div>
               </div>
 
               <!-- Accordion Tag Guide -->
@@ -1234,8 +1436,26 @@ onMounted(() => {
               <!-- Mini A4 Paper Container -->
               <div class="bg-white p-5 rounded-lg border border-slate-300 shadow-sm text-black font-serif text-[10px] space-y-2.5">
                 <!-- Kop Mini -->
-                <div v-if="letterheadType === 'image' && letterheadImagePreview" class="text-center pb-1 border-b border-slate-200">
-                  <img :src="letterheadImagePreview" alt="Kop Gambar" class="max-h-14 object-contain w-auto mx-auto" />
+                <div
+                  v-if="letterheadType === 'image' && letterheadImagePreview"
+                  class="w-full text-center pb-1 border-b border-slate-200 transition-all"
+                  :style="{
+                    marginBottom: (letterConfig.header_margin_bottom || 10) + 'px',
+                    textAlign: (letterConfig.header_alignment || 'center') as any
+                  }"
+                >
+                  <img
+                    :src="letterheadImagePreview"
+                    alt="Kop Gambar"
+                    :style="{
+                      width: letterConfig.header_width_mode === 'full' ? '100%' : 'auto',
+                      maxWidth: '100%',
+                      maxHeight: letterConfig.header_width_mode === 'full' ? 'none' : ((letterConfig.header_max_height || 130) * 0.45) + 'px',
+                      objectFit: (letterConfig.header_width_mode === 'full' ? 'fill' : 'contain') as any,
+                      display: 'block',
+                      margin: letterConfig.header_alignment === 'left' ? '0 auto 0 0' : letterConfig.header_alignment === 'right' ? '0 0 0 auto' : '0 auto'
+                    }"
+                  />
                 </div>
                 <div v-else class="text-center pb-1">
                   <p class="font-bold uppercase tracking-wider text-[9px]">{{ letterConfig.institution_level1 }}</p>

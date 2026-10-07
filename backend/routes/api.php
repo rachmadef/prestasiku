@@ -19,6 +19,9 @@ use App\Http\Controllers\Api\V1\SchoolRegistrationController;
 use App\Http\Controllers\Api\V1\Student\StudentAchievementController;
 use App\Http\Controllers\Api\V1\Student\StudentDispensationController;
 use App\Http\Controllers\Api\V1\Student\StudentRegistrationController;
+use App\Http\Controllers\Api\V1\Student\StudentPermissionController;
+use App\Http\Controllers\Api\V1\School\SchoolSupervisorController;
+use App\Http\Controllers\Api\V1\School\SchoolPermissionController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -115,11 +118,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
             // Student KBM Dispensations & Form Schema
             Route::get('/dispensations/form-schema', [StudentDispensationController::class, 'getFormSchema'])->name('dispensations.form-schema');
+            Route::get('/dispensations/classmates', [StudentDispensationController::class, 'getClassmates'])->name('dispensations.classmates');
             Route::get('/dispensations', [StudentDispensationController::class, 'index'])->name('dispensations.index');
             Route::post('/dispensations', [StudentDispensationController::class, 'store'])->name('dispensations.store');
             Route::get('/dispensations/{id}', [StudentDispensationController::class, 'show'])->name('dispensations.show');
             Route::get('/dispensations/{id}/download-docx', [StudentDispensationController::class, 'downloadDocx'])->name('dispensations.download-docx');
             Route::get('/dispensations/{id}/download-pdf', [StudentDispensationController::class, 'downloadPdf'])->name('dispensations.download-pdf');
+
+            // Student Competition Permissions & Form Schema
+            Route::get('/permissions/form-schema', [StudentPermissionController::class, 'getFormSchema'])->name('permissions.form-schema');
+            Route::get('/permissions', [StudentPermissionController::class, 'index'])->name('permissions.index');
+            Route::post('/permissions', [StudentPermissionController::class, 'store'])->name('permissions.store');
+            Route::get('/permissions/{id}', [StudentPermissionController::class, 'show'])->name('permissions.show');
 
             // Student Achievements
             Route::get('/achievements', [StudentAchievementController::class, 'index'])->name('achievements.index');
@@ -194,6 +204,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             // KBM Dispensations Management, Form Schema, Kop Surat & Exports
             Route::get('/dispensations/form-schema', [SchoolDispensationController::class, 'getFormSchema'])->name('dispensations.form-schema.get');
             Route::put('/dispensations/form-schema', [SchoolDispensationController::class, 'updateFormSchema'])->name('dispensations.form-schema.update');
+            Route::post('/dispensations/parse-docx-schema', [SchoolDispensationController::class, 'parseDocxSchema'])->name('dispensations.parse-docx-schema');
             Route::get('/dispensations/letter-template', [SchoolDispensationController::class, 'getLetterTemplate'])->name('dispensations.letter-template.get');
             Route::post('/dispensations/letter-template', [SchoolDispensationController::class, 'updateLetterTemplate'])->name('dispensations.letter-template.update');
             Route::get('/dispensations', [SchoolDispensationController::class, 'index'])->name('dispensations.index');
@@ -204,12 +215,29 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/dispensations/{id}/download-docx', [SchoolDispensationController::class, 'downloadDocx'])->name('dispensations.download-docx');
             Route::get('/dispensations/{id}/download-pdf', [SchoolDispensationController::class, 'downloadPdf'])->name('dispensations.download-pdf');
 
+            // Surat Perizinan Mengikuti Lomba (Izin Lomba & Rekomendasi)
+            Route::get('/permissions/form-schema', [SchoolPermissionController::class, 'getFormSchema'])->name('permissions.form-schema.get');
+            Route::put('/permissions/form-schema', [SchoolPermissionController::class, 'updateFormSchema'])->name('permissions.form-schema.update');
+            Route::post('/permissions/parse-docx-schema', [SchoolPermissionController::class, 'parseDocxSchema'])->name('permissions.parse-docx-schema');
+            Route::get('/permissions/letter-template', [SchoolPermissionController::class, 'getLetterTemplate'])->name('permissions.letter-template.get');
+            Route::post('/permissions/letter-template', [SchoolPermissionController::class, 'updateLetterTemplate'])->name('permissions.letter-template.update');
+            Route::get('/permissions', [SchoolPermissionController::class, 'index'])->name('permissions.index');
+            Route::post('/permissions', [SchoolPermissionController::class, 'store'])->name('permissions.store');
+
             // Achievements Management & Verification
             Route::get('/achievements', [SchoolAchievementController::class, 'index'])->name('achievements.index');
             Route::post('/achievements', [SchoolAchievementController::class, 'store'])->name('achievements.store');
             Route::get('/achievements/{achievement}', [SchoolAchievementController::class, 'show'])->name('achievements.show');
             Route::post('/achievements/{achievement}/verify', [SchoolAchievementController::class, 'verify'])->name('achievements.verify');
             Route::get('/achievements/{achievement}/documents/{document}', [SchoolAchievementController::class, 'downloadDocument'])->name('achievements.documents.download');
+
+            // Pendamping Lomba & Pembagian Bisyaroh (SOP Lomba Resmi & Terkurasi)
+            Route::get('/supervisors', [SchoolSupervisorController::class, 'index'])->name('supervisors.index');
+            Route::get('/supervisors/eligible-competitions', [SchoolSupervisorController::class, 'eligibleCompetitions'])->name('supervisors.eligible-competitions');
+            Route::post('/supervisors', [SchoolSupervisorController::class, 'store'])->name('supervisors.store');
+            Route::get('/supervisors/{id}', [SchoolSupervisorController::class, 'show'])->name('supervisors.show');
+            Route::put('/supervisors/{id}', [SchoolSupervisorController::class, 'update'])->name('supervisors.update');
+            Route::delete('/supervisors/{id}', [SchoolSupervisorController::class, 'destroy'])->name('supervisors.destroy');
         });
     });
 });

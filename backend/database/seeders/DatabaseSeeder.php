@@ -35,5 +35,8 @@ class DatabaseSeeder extends Seeder
 
         // 4. Seed Kompetisi Riil Pusat Prestasi Nasional & BPTI Kemendikdasmen
         $this->call(PuspresnasOfficialSeeder::class);
+
+        // 5. Seed Data Siswa Riil dari Data Siswa.xlsx
+        $this->call(RealStudentSeeder::class);
     }
 }
