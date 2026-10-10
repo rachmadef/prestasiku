@@ -282,7 +282,7 @@ const roleBadge = computed(() => {
                 disabled
                 class="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-mono text-slate-500 cursor-not-allowed"
               />
-              <span class="text-[10px] text-slate-400 mt-0.5 block">Username dibuat permanen dari NPSN instansi.</span>
+              <span class="text-[10px] text-slate-400 mt-0.5 block">Username diambil dari kata pertama nama lengkap.</span>
             </div>
 
             <!-- Hak Akses / Role (Readonly) -->

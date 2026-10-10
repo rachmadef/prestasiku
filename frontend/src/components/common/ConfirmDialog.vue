@@ -71,21 +71,14 @@ function getConfirmButtonClass(type: string) {
 </script>
 
 <template>
-  <Transition
-    enter-active-class="transition duration-200 ease-out"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition duration-150 ease-in"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
+  <Transition name="modal-pop">
     <div
       v-if="confirmState.isOpen"
       class="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
       @click.self="handleConfirmResult(false)"
     >
       <div
-        class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200/80 overflow-hidden transform transition-all animate-[modalPop_0.25s_cubic-bezier(0.16,1,0.3,1)]"
+        class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200/80 overflow-hidden transform confirm-box-container"
         role="dialog"
         aria-modal="true"
       >

@@ -19,6 +19,30 @@ body {
   color: #1e293b;
 }
 
+/* Global Smooth Button & Interactive Element Transitions */
+button,
+a,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  cursor: pointer;
+  transition: color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tactile press response for all buttons */
+button:active:not(:disabled),
+a.btn:active,
+[role="button"]:active:not(:disabled),
+input[type="submit"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
 /* Custom subtle scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -37,7 +61,7 @@ body {
 
 /* Glass & Card Utilities */
 .card-hover {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card-hover:hover {
   transform: translateY(-2px);
@@ -50,4 +74,62 @@ body {
 
 .glow-gold {
   box-shadow: 0 10px 25px -5px rgba(248, 183, 0, 0.35);
+}
+
+/* ==========================================================================
+   Global Modal & Pop-Up Animations (Smooth Spring Entry & Fade-Out Exit)
+   ========================================================================== */
+.modal-pop-enter-active,
+.modal-pop-leave-active {
+  transition: opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-pop-enter-active .modal-card-box,
+.modal-pop-enter-active .modal-box-container,
+.modal-pop-enter-active .confirm-box-container,
+.modal-pop-leave-active .modal-card-box,
+.modal-pop-leave-active .modal-box-container,
+.modal-pop-leave-active .confirm-box-container {
+  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-pop-enter-from {
+  opacity: 0;
+}
+
+.modal-pop-enter-from .modal-card-box,
+.modal-pop-enter-from .modal-box-container,
+.modal-pop-enter-from .confirm-box-container {
+  opacity: 0;
+  transform: scale(0.92) translateY(14px);
+}
+
+.modal-pop-leave-to {
+  opacity: 0;
+}
+
+.modal-pop-leave-to .modal-card-box,
+.modal-pop-leave-to .modal-box-container,
+.modal-pop-leave-to .confirm-box-container {
+  opacity: 0;
+  transform: scale(0.95) translateY(8px);
+}
+
+/* ==========================================================================
+   Global Content Entry Animations (Main Body Content Only, Navbar & Sidebar Static)
+   ========================================================================== */
+@keyframes pageContentEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-entry-anim {
+  animation: pageContentEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

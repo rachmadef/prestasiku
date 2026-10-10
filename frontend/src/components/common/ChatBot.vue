@@ -23,7 +23,7 @@ const quickQuestions = [
   'Bagaimana cara mendaftar lomba?',
   'Apa itu Surat Dispensasi KBM?',
   'Bagaimana cara mengunggah Sertifikat Prestasi?',
-  'Apa keuntungan mendaftarkan sekolah?',
+  'Bagaimana cara verifikasi dispensasi via QR?',
 ]
 
 const toggleChat = () => {
@@ -117,25 +117,24 @@ const formatMessageText = (text: string) => {
 
 <template>
   <div class="chatbot-container">
-    <!-- Floating Launcher Button with Groq Lightning Accent -->
+    <!-- Floating Launcher Button with Groq Lightning Accent (Logo Only by Default, Expands on Hover) -->
     <button 
       @click="toggleChat" 
       class="chat-launcher-btn"
       :class="{ 'is-open': isOpen }"
-      aria-label="Tanyakan AI Prestasiku"
-      title="Buka Prestasiku AI Assistant (Powered by Groq)"
+      aria-label="Tanyakan Groq AI"
+      title="Buka Groq AI Assistant"
     >
       <div class="launcher-content">
         <div v-if="!isOpen" class="launcher-icon-wrapper">
-          <i class="fa-solid fa-bolt text-amber-400 animate-pulse text-base"></i>
+          <i class="fa-solid fa-bolt text-amber-400 text-lg"></i>
         </div>
         <svg v-else class="icon-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
-        <span v-if="!isOpen" class="launcher-text flex items-center gap-1.5">
-          <span>Prestasiku AI</span>
-          <span class="px-1.5 py-0.5 rounded-full bg-orange-500/30 text-orange-200 text-[10px] font-mono font-bold tracking-tight">Groq</span>
+        <span v-if="!isOpen" class="launcher-hover-text flex items-center gap-1">
+          <span class="font-extrabold text-xs tracking-wide text-white">Groq AI</span>
         </span>
       </div>
     </button>
@@ -267,29 +266,35 @@ const formatMessageText = (text: string) => {
   font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Floating Launcher Button */
+/* Floating Launcher Button (Logo Only by Default, Expands on Hover) */
 .chat-launcher-btn {
   background: linear-gradient(135deg, #0f172a 0%, #001D60 100%);
   color: #ffffff;
-  border: 1.5px solid rgba(249, 115, 22, 0.4);
-  padding: 12px 20px;
+  border: 1.5px solid rgba(249, 115, 22, 0.5);
+  width: 48px;
+  height: 48px;
   border-radius: 9999px;
   cursor: pointer;
-  box-shadow: 0 10px 25px -5px rgba(0, 29, 96, 0.5), 0 0 15px rgba(249, 115, 22, 0.2);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 10px 25px -5px rgba(0, 29, 96, 0.5), 0 0 15px rgba(249, 115, 22, 0.25);
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
 }
 
 .chat-launcher-btn:hover {
+  width: 115px;
+  border-radius: 9999px;
   transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 14px 28px -5px rgba(0, 29, 96, 0.6), 0 0 20px rgba(249, 115, 22, 0.35);
-  border-color: rgba(249, 115, 22, 0.8);
+  box-shadow: 0 14px 28px -5px rgba(0, 29, 96, 0.6), 0 0 22px rgba(249, 115, 22, 0.4);
+  border-color: rgba(249, 115, 22, 0.9);
 }
 
 .chat-launcher-btn.is-open {
-  padding: 14px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: #0f172a;
   border-color: rgba(249, 115, 22, 0.5);
@@ -299,13 +304,18 @@ const formatMessageText = (text: string) => {
 .launcher-content {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
 }
 
 .launcher-icon-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .icon-close {
@@ -313,10 +323,17 @@ const formatMessageText = (text: string) => {
   height: 20px;
 }
 
-.launcher-text {
-  font-weight: 700;
-  font-size: 13.5px;
-  letter-spacing: 0.2px;
+.launcher-hover-text {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+  white-space: nowrap;
+}
+
+.chat-launcher-btn:hover .launcher-hover-text {
+  max-width: 65px;
+  opacity: 1;
 }
 
 /* Chat Modal Window */

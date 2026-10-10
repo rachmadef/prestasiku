@@ -32,8 +32,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/school-registration',
-    name: 'school-registration',
-    component: () => import('@/views/public/SchoolRegistrationView.vue'),
+    redirect: '/login',
   },
   {
     path: '/login',
@@ -82,6 +81,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/AdminCategoriesView.vue'),
       },
       {
+        path: 'hero-sliders',
+        name: 'admin.hero-sliders',
+        component: () => import('@/views/admin/AdminHeroSlidersView.vue'),
+      },
+      {
         path: 'profile',
         name: 'admin.profile',
         component: () => import('@/views/profile/ProfileView.vue'),
@@ -109,8 +113,7 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'registrations',
-        name: 'school.registrations',
-        component: () => import('@/views/school/SchoolRegistrationsView.vue'),
+        redirect: '/school/achievements',
       },
       {
         path: 'permissions',
@@ -190,8 +193,7 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'registrations',
-        name: 'student.registrations',
-        component: () => import('@/views/student/StudentRegistrationsView.vue'),
+        redirect: '/student/achievements',
       },
       {
         path: 'achievements',

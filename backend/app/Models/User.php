@@ -79,4 +79,27 @@ class User extends Authenticatable
     {
         return $this->hasRole('student');
     }
+
+    /**
+     * Generate a unique username based on the 1st word of a person's full name.
+     */
+    public static function generateUsernameFromName(string $name, ?int $ignoreUserId = null): string
+    {
+        $words = preg_split('/\s+/', trim($name));
+        $firstWord = $words[0] ?? 'user';
+        $baseUsername = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $firstWord));
+        if (empty($baseUsername)) {
+            $baseUsername = 'user';
+        }
+
+        $username = $baseUsername;
+        $counter = 1;
+
+        while (static::where('username', $username)->when($ignoreUserId, fn($q) => $q->where('id', '!=', $ignoreUserId))->exists()) {
+            $username = $baseUsername . $counter;
+            $counter++;
+        }
+
+        return $username;
+    }
 }

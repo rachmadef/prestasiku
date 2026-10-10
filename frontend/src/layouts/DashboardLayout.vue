@@ -61,6 +61,7 @@ const menuGroups = computed<MenuGroup[]>(() => {
       {
         title: 'Master Data',
         items: [
+          { label: 'Foto Juara Hero', path: '/admin/hero-sliders', icon: 'fa-solid fa-images' },
           { label: 'Penyelenggara Resmi', path: '/admin/organizers', icon: 'fa-solid fa-building-columns' },
           { label: 'Kategori Lomba', path: '/admin/categories', icon: 'fa-solid fa-tags' },
         ],
@@ -82,7 +83,6 @@ const menuGroups = computed<MenuGroup[]>(() => {
           { label: 'Dashboard Sekolah', path: '/school/dashboard', icon: 'fa-solid fa-gauge-high' },
           { label: 'Verifikasi Perizinan & Dispensasi', path: '/school/dispensations', icon: 'fa-solid fa-file-signature' },
           { label: 'Pendamping & Bisyaroh', path: '/school/supervisors', icon: 'fa-solid fa-user-gear' },
-          { label: 'Arsip Partisipasi Siswa', path: '/school/registrations', icon: 'fa-solid fa-clipboard-check' },
         ],
       },
       {
@@ -115,7 +115,6 @@ const menuGroups = computed<MenuGroup[]>(() => {
         items: [
           { label: 'Arsip Riwayat Lomba', path: '/student/portfolio', icon: 'fa-solid fa-folder-open' },
           { label: 'Piagam Juara & QR', path: '/student/achievements', icon: 'fa-solid fa-award' },
-          { label: 'Pendaftaran Saya', path: '/student/registrations', icon: 'fa-solid fa-receipt' },
         ],
       },
       {
@@ -220,34 +219,7 @@ function handleLogout() {
           </router-link>
         </div>
 
-        <!-- Public Links Section -->
-        <div class="pt-3 border-t border-white/10 space-y-1">
-          <p class="px-3 text-[10px] uppercase font-bold tracking-wider text-blue-200/50 mb-2">Layanan Publik</p>
-          <router-link
-            to="/competitions"
-            target="_blank"
-            class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-blue-100/70 hover:text-white hover:bg-white/8 transition-colors"
-          >
-            <i class="fa-solid fa-arrow-up-right-from-square text-xs text-brand-gold w-4 text-center"></i>
-            <span>Katalog Resmi Lomba</span>
-          </router-link>
-          <router-link
-            to="/verify"
-            target="_blank"
-            class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-blue-100/70 hover:text-white hover:bg-white/8 transition-colors"
-          >
-            <i class="fa-solid fa-qrcode text-xs text-sky-400 w-4 text-center"></i>
-            <span>Verifikasi QR Prestasi</span>
-          </router-link>
-          <router-link
-            to="/dispensasi/verifikasi"
-            target="_blank"
-            class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-blue-100/70 hover:text-white hover:bg-white/8 transition-colors"
-          >
-            <i class="fa-solid fa-shield-check text-xs text-emerald-400 w-4 text-center"></i>
-            <span>Verifikasi Surat Dispensasi</span>
-          </router-link>
-        </div>
+
       </nav>
 
       <!-- Sidebar Footer / Human Profile Card -->
@@ -409,7 +381,7 @@ function handleLogout() {
       </div>
 
       <!-- Main Workspace Scrollable Container -->
-      <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 page-entry-anim">
         <slot></slot>
       </main>
     </div>

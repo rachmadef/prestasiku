@@ -12,7 +12,7 @@
             <img src="/img/text-white.png" alt="PrestasiKu Logo" class="h-6 w-auto" />
           </div>
           <p class="text-xs text-slate-300 leading-relaxed">
-            Platform manajemen kompetisi dan rekam jejak prestasi pelajar SLTP/SLTA se-Indonesia dengan basis data terverifikasi dan perlindungan privasi.
+            Sistem informasi rekam jejak prestasi, delegasi lomba, dan izin dispensasi KBM digital siswa MA Unggulan K.H. Abd. Wahab Hasbulloh.
           </p>
           <div class="flex items-center gap-3 pt-2 text-slate-400">
             <a href="#" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 hover:text-white transition-colors">
@@ -47,12 +47,6 @@
               <router-link to="/verify" class="hover:text-white transition-colors flex items-center gap-1.5">
                 <i class="fa-solid fa-chevron-right text-[9px] text-brand-gold"></i>
                 Cek Verifikasi QR
-              </router-link>
-            </li>
-            <li>
-              <router-link to="/school-registration" class="hover:text-white transition-colors flex items-center gap-1.5">
-                <i class="fa-solid fa-chevron-right text-[9px] text-brand-gold"></i>
-                Pendaftaran Sekolah
               </router-link>
             </li>
           </ul>

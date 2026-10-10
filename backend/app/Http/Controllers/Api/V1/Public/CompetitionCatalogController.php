@@ -212,4 +212,23 @@ class CompetitionCatalogController extends Controller
 
         return response()->json($result);
     }
+
+    /**
+     * Get platform stats (students, achievements, competitions).
+     */
+    public function stats(): JsonResponse
+    {
+        $totalStudents = \App\Models\Student::count();
+        $totalAchievements = \App\Models\Achievement::count();
+        $totalCompetitions = Competition::published()->count();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total_students' => $totalStudents,
+                'total_achievements' => $totalAchievements,
+                'total_competitions' => $totalCompetitions,
+            ],
+        ]);
+    }
 }

@@ -6,6 +6,7 @@ import Modal from '@/components/common/Modal.vue'
 import SearchableSelect from '@/components/common/SearchableSelect.vue'
 import api, { extractList } from '@/services/api'
 import { useNotify } from '@/composables/useNotify'
+import { exportToExcel } from '@/utils/exportExcel'
 
 const { toast, confirm } = useNotify()
 
@@ -78,9 +79,21 @@ async function fetchData() {
 async function handleAddAchievement() {
   adding.value = true
   try {
-    await api.post('/school/achievements', addForm.value)
+    const titleVal = addForm.value.competition_name_manual || addForm.value.field_name || 'Kejuaraan Siswa'
+    const payload = {
+      student_id: addForm.value.student_id,
+      competition_id: addForm.value.competition_id || null,
+      title: titleVal,
+      event_name: titleVal,
+      organizer_name: addForm.value.organizer_name || 'Penyelenggara Resmi',
+      level: addForm.value.achievement_level || 'nasional',
+      rank: addForm.value.rank || 'Juara 1',
+      event_date: addForm.value.event_date || new Date().toISOString().split('T')[0],
+      status: 'verified',
+    }
+    await api.post('/school/achievements', payload)
     showAddModal.value = false
-    toast.success('Prestasi siswa berhasil dicatat!', 'Prestasi Ditambahkan')
+    toast.success('Prestasi siswa berhasil dicatat dan diverifikasi!', 'Prestasi Ditambahkan')
     fetchData()
   } catch (err: any) {
     toast.error(err.response?.data?.message || 'Gagal menambahkan prestasi.', 'Gagal Simpan')
@@ -90,21 +103,62 @@ async function handleAddAchievement() {
 }
 
 async function handleVerify(ach: any) {
+  const compTitle = ach.title || ach.event_name || ach.competition?.name || 'Prestasi Siswa'
   const ok = await confirm({
     title: 'Verifikasi Prestasi & Terbitkan QR',
-    message: `Verifikasi prestasi "${ach.competition_name || ach.competition?.name}" untuk siswa ${ach.student?.full_name}? Dokumen akan secara resmi disahkan oleh sekolah dan mendapatkan Public ID serta sertifikat QR Code publik.`,
+    message: `Verifikasi prestasi "${compTitle}" untuk siswa ${ach.student?.full_name}? Dokumen akan secara resmi disahkan oleh sekolah dan mendapatkan Public ID serta sertifikat QR Code publik.`,
     type: 'success',
     confirmText: 'Ya, Verifikasi & Terbitkan',
   })
   if (!ok) return
 
   try {
-    await api.post(`/school/achievements/${ach.id}/verify`)
+    await api.post(`/school/achievements/${ach.id}/verify`, {
+      status: 'verified',
+    })
     toast.success('Prestasi berhasil diverifikasi dan QR Publik resmi telah diterbitkan!', 'Verifikasi Berhasil')
     fetchData()
   } catch (err: any) {
     toast.error(err.response?.data?.message || 'Gagal memverifikasi prestasi.', 'Verifikasi Gagal')
   }
+}
+
+function exportAchievementsExcel() {
+  if (!achievements.value || achievements.value.length === 0) {
+    toast.error('Tidak ada data rekam prestasi untuk di-export.', 'Export Gagal')
+    return
+  }
+
+  const headers = [
+    'No',
+    'Nama Siswa',
+    'NIS',
+    'Kelas',
+    'Nama Kompetisi / Kejuaraan',
+    'Peringkat / Capaian',
+    'Tingkat Wilayah',
+    'Penyelenggara',
+    'Tanggal Kejuaraan',
+    'Public ID Verifikasi',
+    'Status Verifikasi',
+  ]
+
+  const rows = achievements.value.map((ach: any, idx: number) => [
+    idx + 1,
+    ach.student?.full_name || ach.student?.user?.name || '-',
+    ach.student?.nis || '-',
+    ach.student?.class_name || '-',
+    ach.title || ach.event_name || ach.competition?.name || ach.competition_name_manual || '-',
+    ach.rank || '-',
+    (ach.level || ach.achievement_level || '').toUpperCase(),
+    ach.organizer_name || ach.field_name || '-',
+    ach.event_date || '-',
+    ach.public_id || '-',
+    (ach.status || 'draft').toUpperCase(),
+  ])
+
+  exportToExcel('Rekap_Prestasi_Siswa_MA_Unggulan', headers, rows)
+  toast.success('File Rekapitulasi Excel Prestasi berhasil diunduh!', 'Export Berhasil')
 }
 
 onMounted(() => {
@@ -118,16 +172,26 @@ onMounted(() => {
     <template #header-subtitle>Pencatatan rekam jejak juara, sertifikat, dan penerbitan QR verifikasi digital.</template>
 
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
         <p class="text-xs text-slate-500">Daftar capaian prestasi siswa yang tercatat di pangkalan data sekolah.</p>
-        <button
-          type="button"
-          @click="showAddModal = true"
-          class="px-4 py-2 bg-brand-navy hover:bg-[#001442] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2"
-        >
-          <i class="fa-solid fa-plus text-brand-gold"></i>
-          <span>Catat Prestasi Baru</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="exportAchievementsExcel"
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <i class="fa-solid fa-file-excel"></i>
+            <span>Export Excel</span>
+          </button>
+          <button
+            type="button"
+            @click="showAddModal = true"
+            class="px-4 py-2 bg-brand-navy hover:bg-[#001442] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <i class="fa-solid fa-plus text-brand-gold"></i>
+            <span>Catat Prestasi Baru</span>
+          </button>
+        </div>
       </div>
 
       <!-- Achievements Table -->
@@ -152,12 +216,12 @@ onMounted(() => {
               </tr>
               <tr v-for="ach in achievements" :key="ach.id" class="hover:bg-slate-50/50 transition-colors">
                 <td class="px-6 py-4">
-                  <div class="font-bold text-slate-900">{{ ach.student?.full_name || '-' }}</div>
-                  <div class="text-[11px] text-slate-400">Kelas {{ ach.student?.class_name }} • NIS {{ ach.student?.nis }}</div>
+                  <div class="font-bold text-slate-900">{{ ach.student?.full_name || ach.student?.user?.name || '-' }}</div>
+                  <div class="text-[11px] text-slate-400">Kelas {{ ach.student?.class_name || '-' }} • NIS {{ ach.student?.nis || '-' }}</div>
                 </td>
                 <td class="px-6 py-4">
-                  <div class="font-semibold text-slate-800">{{ ach.competition?.name || ach.competition_name_manual }}</div>
-                  <div class="text-[11px] text-slate-400 capitalize">{{ ach.achievement_level }} • {{ ach.field_name || '-' }}</div>
+                  <div class="font-semibold text-slate-800">{{ ach.title || ach.event_name || ach.competition?.name || ach.competition_name_manual || '-' }}</div>
+                  <div class="text-[11px] text-slate-400 capitalize">{{ (ach.level || ach.achievement_level || '').replace('_', ' ') }} • {{ ach.organizer_name || ach.field_name || '-' }}</div>
                 </td>
                 <td class="px-6 py-4 font-bold text-amber-700 flex items-center gap-1">
                   <i class="fa-solid fa-trophy text-brand-gold text-xs"></i>
@@ -170,14 +234,14 @@ onMounted(() => {
                   <span v-else class="text-slate-400 italic">Belum terbit</span>
                 </td>
                 <td class="px-6 py-4">
-                  <Badge :status="ach.verification_status || 'draft'" />
+                  <Badge :status="ach.status || 'draft'" />
                 </td>
                 <td class="px-6 py-4 text-right space-x-2">
                   <button
-                    v-if="ach.verification_status !== 'verified'"
+                    v-if="ach.status !== 'verified'"
                     type="button"
                     @click="handleVerify(ach)"
-                    class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs"
+                    class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs cursor-pointer"
                   >
                     <i class="fa-solid fa-shield-check mr-1"></i> Terbitkan QR
                   </button>
@@ -185,7 +249,7 @@ onMounted(() => {
                     v-if="ach.public_id"
                     :to="`/verify/${ach.public_id}`"
                     target="_blank"
-                    class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-brand-blue rounded-lg text-xs font-semibold"
+                    class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-brand-blue rounded-lg text-xs font-semibold cursor-pointer"
                     title="Lihat Sertifikat QR"
                   >
                     <i class="fa-solid fa-qrcode mr-1"></i> QR

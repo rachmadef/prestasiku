@@ -8,6 +8,7 @@ import api, { extractList } from '@/services/api'
 const authStore = useAuthStore()
 const loading = ref(true)
 const students = ref<any[]>([])
+const totalStudentsCount = ref(0)
 const registrations = ref<any[]>([])
 const dispensations = ref<any[]>([])
 const achievements = ref<any[]>([])
@@ -16,12 +17,14 @@ async function fetchSchoolData() {
   loading.value = true
   try {
     const [studRes, regRes, dispRes, achRes] = await Promise.all([
-      api.get('/school/students').catch(() => ({ data: { data: [] } })),
+      api.get('/school/students?per_page=all').catch(() => ({ data: { data: [] } })),
       api.get('/school/registrations').catch(() => ({ data: { data: [] } })),
       api.get('/school/dispensations').catch(() => ({ data: { data: [] } })),
       api.get('/school/achievements').catch(() => ({ data: { data: [] } })),
     ])
-    students.value = extractList(studRes.data.data)
+    const extractedStudents = extractList(studRes.data.data)
+    students.value = extractedStudents
+    totalStudentsCount.value = studRes.data.data?.total ?? extractedStudents.length
     registrations.value = extractList(regRes.data.data)
     dispensations.value = extractList(dispRes.data.data)
     achievements.value = extractList(achRes.data.data)
@@ -119,11 +122,11 @@ onMounted(() => {
               <span>Buat Dispensasi KBM</span>
             </router-link>
             <router-link
-              to="/school/registrations"
+              to="/school/achievements"
               class="px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white font-semibold text-xs rounded-xl border border-white/20 transition-colors flex items-center gap-2"
             >
-              <i class="fa-solid fa-clipboard-check text-brand-gold"></i>
-              <span>Catat Hasil & Delegasi</span>
+              <i class="fa-solid fa-medal text-brand-gold"></i>
+              <span>Rekam Prestasi Juara</span>
             </router-link>
           </div>
         </div>
@@ -216,7 +219,7 @@ onMounted(() => {
           </div>
           <div>
             <div class="text-2xl font-black text-slate-800">
-              {{ students.length }}
+              {{ totalStudentsCount }}
             </div>
             <div class="text-[11px] text-slate-500 mt-0.5">
               Basis data siswa tenant aktif
@@ -299,7 +302,7 @@ onMounted(() => {
               </h2>
               <p class="text-xs text-slate-500">Mendokumentasikan seluruh siswa yang pernah berlomba.</p>
             </div>
-            <router-link to="/school/registrations" class="text-xs font-bold text-brand-blue hover:underline">
+            <router-link to="/school/achievements" class="text-xs font-bold text-brand-blue hover:underline">
               Buku Arsip &rarr;
             </router-link>
           </div>
@@ -337,7 +340,7 @@ onMounted(() => {
               </div>
 
               <router-link
-                to="/school/registrations"
+                to="/school/achievements"
                 class="px-3 py-1.5 bg-brand-navy hover:bg-[#001442] text-white text-xs font-bold rounded-lg shadow-2xs transition-colors self-start sm:self-auto shrink-0 flex items-center gap-1.5"
               >
                 <i class="fa-solid fa-pen-to-square text-brand-gold"></i>

@@ -63,6 +63,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ->middleware('throttle:20,1')
         ->name('competitions.ai_verify');
     Route::get('/categories', [CompetitionCatalogController::class, 'categories'])->name('categories.index');
+    Route::get('/hero-sliders', [\App\Http\Controllers\Api\V1\Admin\HeroSliderController::class, 'publicIndex'])->name('public.hero-sliders');
+    Route::get('/public-stats', [CompetitionCatalogController::class, 'stats'])->name('public.stats');
 
     // Public QR Verification (Privacy-by-default & Anti-scraping Throttled)
     Route::get('/verify/{public_id}', [PublicVerificationController::class, 'verify'])
@@ -173,7 +175,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/competitions/sync-all-ai', [CompetitionManagementController::class, 'syncAllAI'])->name('competitions.sync_all_ai');
             Route::get('/competitions/{id}', [CompetitionManagementController::class, 'show'])->name('competitions.show');
             Route::post('/competitions/{id}/verify', [CompetitionManagementController::class, 'verify'])->name('competitions.verify');
-            Route::post('/competitions/{id}/forms', [CompetitionManagementController::class, 'storeForm'])->name('competitions.forms.store');
+            // Hero Slider Banner CRUD
+            Route::get('/hero-sliders', [\App\Http\Controllers\Api\V1\Admin\HeroSliderController::class, 'adminIndex'])->name('hero-sliders.index');
+            Route::post('/hero-sliders', [\App\Http\Controllers\Api\V1\Admin\HeroSliderController::class, 'store'])->name('hero-sliders.store');
+            Route::post('/hero-sliders/{id}', [\App\Http\Controllers\Api\V1\Admin\HeroSliderController::class, 'update'])->name('hero-sliders.update');
+            Route::patch('/hero-sliders/{id}/toggle-active', [\App\Http\Controllers\Api\V1\Admin\HeroSliderController::class, 'toggleActive'])->name('hero-sliders.toggle-active');
+            Route::delete('/hero-sliders/{id}', [\App\Http\Controllers\Api\V1\Admin\HeroSliderController::class, 'destroy'])->name('hero-sliders.destroy');
         });
 
         // =========================================================

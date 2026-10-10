@@ -576,77 +576,79 @@ async function submitSchoolRegistration() {
 
     <!-- Popup Notifikasi Pendaftaran Berhasil & Kontak Admin -->
     <Teleport to="body">
-      <div
-        v-if="showSuccessModal"
-        class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 sm:p-6"
-        role="dialog"
-        aria-modal="true"
-      >
-        <!-- Backdrop with soft blur -->
+      <Transition name="modal-pop">
         <div
-          class="fixed inset-0 bg-[#001D60]/60 backdrop-blur-xs transition-opacity"
-          @click="showSuccessModal = false"
-        ></div>
+          v-if="showSuccessModal"
+          class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <!-- Backdrop with soft blur -->
+          <div
+            class="fixed inset-0 bg-[#001D60]/60 backdrop-blur-xs transition-opacity"
+            @click="showSuccessModal = false"
+          ></div>
 
-        <!-- Modal Dialog Box -->
-        <div class="relative bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 z-10 text-center transform transition-all">
-          <!-- Icon -->
-          <div class="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl mx-auto shadow-inner ring-8 ring-emerald-50 mb-4">
-            <i class="fa-solid fa-circle-check"></i>
-          </div>
-
-          <!-- Title -->
-          <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Pendaftaran Berhasil!
-          </h3>
-
-          <!-- Registered School Badge -->
-          <div v-if="form.school_name" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-brand-navy border border-blue-200/80 text-xs font-semibold">
-            <i class="fa-solid fa-school text-brand-blue"></i>
-            <span class="truncate max-w-xs">{{ form.school_name }}</span>
-            <span class="text-slate-400">•</span>
-            <span class="text-slate-600">NPSN: {{ submittedNpsn || form.npsn }}</span>
-          </div>
-
-          <!-- Exact message requested by user -->
-          <div class="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm text-slate-700 leading-relaxed text-center font-medium">
-            Pendaftaran berhasil. Silahkan hubungi admin dibawah ini untuk mendapatkan persetujuan login ke dashboard admin.
-          </div>
-
-          <!-- Admin Contact Pill -->
-          <div class="mt-4 flex items-center justify-center gap-3 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900">
-            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg shadow-xs shrink-0">
-              <i class="fa-brands fa-whatsapp"></i>
+          <!-- Modal Dialog Box -->
+          <div class="relative bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 z-10 text-center transform transition-all modal-card-box">
+            <!-- Icon -->
+            <div class="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl mx-auto shadow-inner ring-8 ring-emerald-50 mb-4">
+              <i class="fa-solid fa-circle-check"></i>
             </div>
-            <div class="text-left">
-              <p class="text-[10px] uppercase font-bold tracking-wider text-emerald-700">Admin Persetujuan PrestasiKu</p>
-              <p class="text-base font-black text-emerald-950 font-mono tracking-wider">{{ adminPhoneNumber }}</p>
+
+            <!-- Title -->
+            <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              Pendaftaran Berhasil!
+            </h3>
+
+            <!-- Registered School Badge -->
+            <div v-if="form.school_name" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-brand-navy border border-blue-200/80 text-xs font-semibold">
+              <i class="fa-solid fa-school text-brand-blue"></i>
+              <span class="truncate max-w-xs">{{ form.school_name }}</span>
+              <span class="text-slate-400">•</span>
+              <span class="text-slate-600">NPSN: {{ submittedNpsn || form.npsn }}</span>
             </div>
-          </div>
 
-          <!-- Action Buttons -->
-          <div class="mt-6 flex flex-col sm:flex-row gap-3">
-            <!-- Hubungi Admin Button -->
-            <a
-              :href="whatsappAdminUrl"
-              target="_blank"
-              class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-extrabold shadow-md hover:shadow-lg transition-all cursor-pointer"
-            >
-              <i class="fa-brands fa-whatsapp text-lg"></i>
-              <span>Hubungi Admin ({{ adminPhoneNumber }})</span>
-            </a>
+            <!-- Exact message requested by user -->
+            <div class="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm text-slate-700 leading-relaxed text-center font-medium">
+              Pendaftaran berhasil. Silahkan hubungi admin dibawah ini untuk mendapatkan persetujuan login ke dashboard admin.
+            </div>
 
-            <!-- Selesai / OK Button -->
-            <button
-              type="button"
-              @click="showSuccessModal = false"
-              class="sm:w-32 inline-flex items-center justify-center px-5 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-slate-200/80"
-            >
-              <span>Selesai / OK</span>
-            </button>
+            <!-- Admin Contact Pill -->
+            <div class="mt-4 flex items-center justify-center gap-3 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+              <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg shadow-xs shrink-0">
+                <i class="fa-brands fa-whatsapp"></i>
+              </div>
+              <div class="text-left">
+                <p class="text-[10px] uppercase font-bold tracking-wider text-emerald-700">Admin Persetujuan PrestasiKu</p>
+                <p class="text-base font-black text-emerald-950 font-mono tracking-wider">{{ adminPhoneNumber }}</p>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 flex flex-col sm:flex-row gap-3">
+              <!-- Hubungi Admin Button -->
+              <a
+                :href="whatsappAdminUrl"
+                target="_blank"
+                class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-extrabold shadow-md hover:shadow-lg transition-all cursor-pointer"
+              >
+                <i class="fa-brands fa-whatsapp text-lg"></i>
+                <span>Hubungi Admin ({{ adminPhoneNumber }})</span>
+              </a>
+
+              <!-- Selesai / OK Button -->
+              <button
+                type="button"
+                @click="showSuccessModal = false"
+                class="sm:w-32 inline-flex items-center justify-center px-5 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-slate-200/80"
+              >
+                <span>Selesai / OK</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
   </PublicLayout>
 </template>

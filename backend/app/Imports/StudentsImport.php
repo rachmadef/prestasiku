@@ -92,8 +92,8 @@ class StudentsImport implements ToCollection, WithHeadingRow
                 continue;
             }
 
-            // Generate user email and username
-            $username = $this->school->npsn . '_' . $nis;
+            // Generate user email and username from 1st word of full_name
+            $username = User::generateUsernameFromName($fullName);
             $userEmail = $email ?: ($username . '@siswa.prestasiku.id');
 
             // Handle potential email collisions
@@ -103,23 +103,26 @@ class StudentsImport implements ToCollection, WithHeadingRow
 
             DB::beginTransaction();
             try {
-                // 1. Create User account with default password '1234'
-                $user = User::create([
+                $userData = [
                     'name' => $fullName,
                     'email' => $userEmail,
                     'username' => $username,
                     'phone' => $phoneNumber,
-                    'school_id' => $this->school->id,
                     'password' => Hash::make('1234'),
                     'must_change_password' => true,
                     'status' => 'active',
-                ]);
+                ];
+                if (\Schema::hasColumn('users', 'school_id') && $this->school?->id) {
+                    $userData['school_id'] = $this->school->id;
+                }
+
+                // 1. Create User account with default password '1234'
+                $user = User::create($userData);
                 $user->assignRole('student');
 
                 // 2. Create Student record
-                Student::create([
+                $studentData = [
                     'user_id' => $user->id,
-                    'school_id' => $this->school->id,
                     'nis' => $nis,
                     'nisn' => $nisn,
                     'full_name' => $fullName,
@@ -131,7 +134,12 @@ class StudentsImport implements ToCollection, WithHeadingRow
                     'phone_number' => $phoneNumber,
                     'public_profile_enabled' => false,
                     'status' => 'active',
-                ]);
+                ];
+                if (\Schema::hasColumn('students', 'school_id') && $this->school?->id) {
+                    $studentData['school_id'] = $this->school->id;
+                }
+
+                Student::create($studentData);
 
                 DB::commit();
                 $this->successfulRows++;

@@ -224,6 +224,54 @@ async function handleCreateDirect() {
   }
 }
 
+import { exportToExcel } from '@/utils/exportExcel'
+
+function exportDispensationsExcel() {
+  if (!dispensations.value || dispensations.value.length === 0) {
+    toast.error('Tidak ada data perizinan dispensasi untuk di-export.', 'Export Gagal')
+    return
+  }
+
+  const headers = [
+    'No',
+    'Nomor Surat / Ref',
+    'Nama Lomba / Kegiatan',
+    'Jenis / Alasan Dispensasi',
+    'Siswa Penerima Izin',
+    'Jumlah Siswa',
+    'Tanggal Mulai',
+    'Tanggal Selesai',
+    'Durasi / Waktu',
+    'Guru Pembimbing / Pendamping',
+    'Status Persetujuan',
+  ]
+
+  const rows = filteredDispensations.value.map((d: any, idx: number) => {
+    const studentNames = d.students && d.students.length > 0
+      ? d.students.map((s: any) => `${s.full_name} (${s.class_name || '-'})`).join('; ')
+      : (d.student?.full_name || '-')
+
+    const timeStr = d.is_all_day ? 'Seharian Penuh' : `${d.start_time || ''} - ${d.end_time || ''}`
+
+    return [
+      idx + 1,
+      d.reference_number || '-',
+      d.competition_name || d.title || '-',
+      (d.dispensation_type || 'persiapan_latihan').replace(/_/g, ' ').toUpperCase(),
+      studentNames,
+      d.students?.length || 1,
+      d.start_date ? String(d.start_date).split('T')[0] : '-',
+      d.end_date ? String(d.end_date).split('T')[0] : '-',
+      timeStr,
+      d.supervisor_name || '-',
+      (d.status || 'pending').toUpperCase(),
+    ]
+  })
+
+  exportToExcel('Rekap_Dispensasi_KBM_MA_Unggulan', headers, rows)
+  toast.success('File Rekapitulasi Excel Dispensasi KBM berhasil diunduh!', 'Export Berhasil')
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -249,7 +297,17 @@ onMounted(() => {
           </p>
         </div>
 
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <button
+            type="button"
+            @click="exportDispensationsExcel"
+            class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold border border-emerald-700 shadow-2xs transition-all cursor-pointer"
+            title="Unduh Rekapitulasi Data Dispensasi Format Excel"
+          >
+            <i class="fa-solid fa-file-excel"></i>
+            <span>Export Excel</span>
+          </button>
+
           <router-link
             to="/school/dispensations/form-settings"
             class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 shadow-2xs transition-all cursor-pointer"

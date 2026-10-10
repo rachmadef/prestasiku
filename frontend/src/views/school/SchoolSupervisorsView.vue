@@ -179,6 +179,42 @@ const getCurationLabel = (type?: string) => {
   return 'Non-Kurasi'
 }
 
+import { exportToExcel } from '@/utils/exportExcel'
+
+const exportSupervisorsExcel = () => {
+  if (!supervisors.value || supervisors.value.length === 0) {
+    toast.error('Tidak ada data pendamping & bisyaroh untuk di-export.', 'Export Gagal')
+    return
+  }
+
+  const headers = [
+    'No',
+    'Nama Pendamping / Pembimbing',
+    'NIP / NIK',
+    'No HP / WhatsApp',
+    'Peran / Jabatan',
+    'Nama Kompetisi / Lomba',
+    'Alokasi Bisyaroh (Rp)',
+    'Status SOP / Pencairan',
+    'Catatan / Keterangan',
+  ]
+
+  const rows = filteredSupervisors.value.map((item, idx) => [
+    idx + 1,
+    item.supervisor_name,
+    item.supervisor_nip || '-',
+    item.supervisor_phone || '-',
+    item.role_title,
+    item.competition?.title || '-',
+    item.bisyaroh_amount || 0,
+    item.status === 'disbursed' ? 'Sudah Dicairkan' : item.status === 'approved' ? 'Disetujui SOP' : 'Menunggu',
+    item.notes || '-',
+  ])
+
+  exportToExcel('Rekap_Pendamping_Bisyaroh_MA_Unggulan', headers, rows)
+  toast.success('File Rekapitulasi Excel Pendamping & Bisyaroh berhasil diunduh!', 'Export Berhasil')
+}
+
 onMounted(() => {
   fetchSupervisors()
   fetchEligibleCompetitions()
@@ -205,7 +241,16 @@ onMounted(() => {
           </p>
         </div>
 
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <button
+            type="button"
+            @click="exportSupervisorsExcel"
+            class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold border border-emerald-700 shadow-2xs transition-all cursor-pointer"
+            title="Unduh Rekapitulasi Data Pendamping & Bisyaroh Format Excel"
+          >
+            <i class="fa-solid fa-file-excel"></i>
+            <span>Export Excel</span>
+          </button>
           <button
             type="button"
             @click="openModal"

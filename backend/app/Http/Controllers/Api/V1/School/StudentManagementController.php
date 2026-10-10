@@ -21,14 +21,10 @@ class StudentManagementController extends Controller
     {
         $school = $request->user()->school;
 
-        if (! $school) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akun Anda tidak terikat dengan instansi sekolah manapun.',
-            ], 403);
+        $query = Student::with('user:id,name,email,username,status');
+        if ($school && \Schema::hasColumn('students', 'school_id')) {
+            $query->where('school_id', $school->id);
         }
-
-        $query = Student::where('school_id', $school->id)->with('user:id,name,email,username,status');
 
         if ($request->filled('grade_level')) {
             $query->where('grade_level', $request->input('grade_level'));
@@ -55,8 +51,21 @@ class StudentManagementController extends Controller
             });
         }
 
+        if ($request->input('per_page') === 'all' || $request->input('all') == 1) {
+            $students = $query->orderBy('grade_level')->orderBy('class_name')->orderBy('full_name')->get();
+            return response()->json([
+                'success' => true,
+                'data' => $students,
+            ]);
+        }
+
+        $perPage = (int) $request->input('per_page', 20);
+        if ($perPage <= 0) {
+            $perPage = 20;
+        }
+
         $students = $query->orderBy('grade_level')->orderBy('class_name')->orderBy('full_name')
-            ->paginate($request->input('per_page', 20));
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -70,9 +79,10 @@ class StudentManagementController extends Controller
     public function store(StoreStudentRequest $request): JsonResponse
     {
         $school = $request->user()->school;
+        $schoolId = $school ? $school->id : null;
 
         $validated = $request->validated();
-        $username = $school->npsn . '_' . $validated['nis'];
+        $username = User::generateUsernameFromName($validated['full_name']);
         $userEmail = $validated['email'] ?? ($username . '@siswa.prestasiku.id');
 
         if (User::where('email', $userEmail)->exists()) {
@@ -81,23 +91,26 @@ class StudentManagementController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Create User account with initial password '1234'
-            $user = User::create([
+            $userData = [
                 'name' => $validated['full_name'],
                 'email' => $userEmail,
                 'username' => $username,
                 'phone' => $validated['phone_number'] ?? null,
-                'school_id' => $school->id,
                 'password' => Hash::make('1234'),
                 'must_change_password' => true,
                 'status' => 'active',
-            ]);
+            ];
+            if (\Schema::hasColumn('users', 'school_id') && $schoolId) {
+                $userData['school_id'] = $schoolId;
+            }
+
+            // 1. Create User account with initial password '1234'
+            $user = User::create($userData);
             $user->assignRole('student');
 
             // 2. Create Student record
-            $student = Student::create([
+            $studentData = [
                 'user_id' => $user->id,
-                'school_id' => $school->id,
                 'nis' => $validated['nis'],
                 'nisn' => $validated['nisn'] ?? null,
                 'full_name' => $validated['full_name'],
@@ -109,7 +122,12 @@ class StudentManagementController extends Controller
                 'phone_number' => $validated['phone_number'] ?? null,
                 'public_profile_enabled' => false,
                 'status' => 'active',
-            ]);
+            ];
+            if (\Schema::hasColumn('students', 'school_id') && $schoolId) {
+                $studentData['school_id'] = $schoolId;
+            }
+
+            $student = Student::create($studentData);
 
             DB::commit();
         } catch (\Throwable $e) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import Badge from '@/components/common/Badge.vue'
 import Modal from '@/components/common/Modal.vue'
@@ -12,6 +12,10 @@ const students = ref<any[]>([])
 const loading = ref(true)
 const searchQuery = ref('')
 
+// Pagination state
+const currentPage = ref(1)
+const perPage = ref(15)
+
 const filteredStudents = computed(() => {
   const list = Array.isArray(students.value) ? students.value : []
   const q = searchQuery.value.trim().toLowerCase()
@@ -22,6 +26,60 @@ const filteredStudents = computed(() => {
     s.nisn?.toLowerCase().includes(q) ||
     s.class_name?.toLowerCase().includes(q)
   )
+})
+
+const totalItems = computed(() => filteredStudents.value.length)
+const totalPages = computed(() => Math.ceil(totalItems.value / perPage.value) || 1)
+
+const paginatedStudents = computed(() => {
+  const start = (currentPage.value - 1) * perPage.value
+  return filteredStudents.value.slice(start, start + perPage.value)
+})
+
+const displayRangeStart = computed(() => {
+  if (totalItems.value === 0) return 0
+  return (currentPage.value - 1) * perPage.value + 1
+})
+
+const displayRangeEnd = computed(() => {
+  return Math.min(currentPage.value * perPage.value, totalItems.value)
+})
+
+// Reset to page 1 on search or limit change
+watch([searchQuery, perPage], () => {
+  currentPage.value = 1
+})
+
+function goToPage(page: number) {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+  }
+}
+
+// Generate smart page numbers (e.g. 1, 2, 3 ... 43)
+const visiblePages = computed(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+  const delta = 2
+  const range: (number | string)[] = []
+
+  for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+    range.push(i)
+  }
+
+  if (current - delta > 2) {
+    range.unshift('...')
+  }
+  if (current + delta < total - 1) {
+    range.push('...')
+  }
+
+  range.unshift(1)
+  if (total > 1) {
+    range.push(total)
+  }
+
+  return range
 })
 
 // Add Student Modal
@@ -40,16 +98,87 @@ const addForm = ref({
 })
 const addingStudent = ref(false)
 
+// Edit Student Modal
+const showEditModal = ref(false)
+const editingStudentId = ref<number | null>(null)
+const editForm = ref({
+  full_name: '',
+  nis: '',
+  nisn: '',
+  grade_level: 10,
+  class_name: '',
+  gender: 'L',
+  birth_place: '',
+  birth_date: '',
+  phone_number: '',
+  status: 'active',
+})
+const updatingStudent = ref(false)
+
+function openEditModal(student: any) {
+  editingStudentId.value = student.id
+  editForm.value = {
+    full_name: student.full_name || '',
+    nis: student.nis || '',
+    nisn: student.nisn || '',
+    grade_level: student.grade_level || 10,
+    class_name: student.class_name || '',
+    gender: student.gender || 'L',
+    birth_place: student.birth_place || '',
+    birth_date: student.birth_date ? student.birth_date.split('T')[0] : '',
+    phone_number: student.phone_number || '',
+    status: student.status || 'active',
+  }
+  showEditModal.value = true
+}
+
+async function handleUpdateStudent() {
+  if (!editingStudentId.value) return
+  updatingStudent.value = true
+  try {
+    await api.put(`/school/students/${editingStudentId.value}`, editForm.value)
+    showEditModal.value = false
+    fetchStudents()
+    toast.success('Data siswa berhasil diperbarui!', 'Perubahan Disimpan')
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal memperbarui data siswa.', 'Gagal Perbarui')
+  } finally {
+    updatingStudent.value = false
+  }
+}
+
+async function handleDeleteStudent(student: any) {
+  const ok = await confirm({
+    title: 'Hapus Data Siswa',
+    message: `Apakah Anda yakin ingin menghapus data siswa "${student.full_name}" (NIS: ${student.nis}) beserta akun penggunanya? Tindakan ini tidak dapat dibatalkan.`,
+    type: 'danger',
+    confirmText: 'Ya, Hapus Siswa',
+  })
+  if (!ok) return
+
+  try {
+    await api.delete(`/school/students/${student.id}`)
+    toast.success(`Data siswa ${student.full_name} berhasil dihapus.`, 'Terhapus')
+    fetchStudents()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal menghapus data siswa.', 'Gagal Hapus')
+  }
+}
+
 // Bulk Import Modal
 const showImportModal = ref(false)
 const importFile = ref<File | null>(null)
 const importing = ref(false)
 const importResult = ref<any>(null)
 
+const perPageOption = ref<'all' | number>('all')
+
 async function fetchStudents() {
   loading.value = true
   try {
-    const res = await api.get('/school/students')
+    const res = await api.get('/school/students', {
+      params: { per_page: perPageOption.value },
+    })
     students.value = extractList(res.data.data)
   } catch (err) {
     console.error('Error loading students:', err)
@@ -128,8 +257,22 @@ async function submitImport() {
   }
 }
 
-function downloadTemplate() {
-  window.open('/api/v1/school/students-import/template', '_blank')
+async function downloadTemplate() {
+  try {
+    const res = await api.get('/school/students-import/template', {
+      responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'template_import_siswa_prestasiku.xlsx')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Error downloading template:', err)
+  }
 }
 
 onMounted(() => {
@@ -144,24 +287,47 @@ onMounted(() => {
 
     <div class="space-y-6">
       <!-- Action Bar -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="relative flex-1 max-w-md">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center gap-3 flex-1 max-w-xl">
+          <div class="relative flex-1">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <i class="fa-solid fa-magnifying-glass text-xs"></i>
+            </div>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Cari nama siswa, NIS, atau kelas..."
+              class="w-full pl-9 pr-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue shadow-2xs"
+            />
           </div>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Cari nama siswa, NIS, atau kelas..."
-            class="w-full pl-9 pr-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue shadow-2xs"
-          />
+
+          <!-- Total Count Badge -->
+          <span class="px-3 py-2 bg-blue-50 text-brand-blue border border-blue-200/80 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5">
+            <i class="fa-solid fa-users text-brand-gold"></i>
+            <span>{{ filteredStudents.length }} Siswa</span>
+          </span>
         </div>
 
         <div class="flex items-center gap-2">
+          <!-- Limit selector dropdown -->
+          <div class="flex items-center gap-1.5 bg-white px-3 py-1.5 border border-slate-200 rounded-xl text-xs shrink-0">
+            <span class="text-slate-500 font-semibold">Tampilkan:</span>
+            <select
+              v-model="perPageOption"
+              @change="fetchStudents"
+              class="bg-transparent font-bold text-brand-navy focus:outline-hidden cursor-pointer"
+            >
+              <option value="all">Semua Siswa</option>
+              <option :value="20">20 per Hal</option>
+              <option :value="50">50 per Hal</option>
+              <option :value="100">100 per Hal</option>
+            </select>
+          </div>
+
           <button
             type="button"
             @click="showImportModal = true"
-            class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+            class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <i class="fa-solid fa-file-excel"></i>
             <span>Import Excel / CSV</span>
@@ -169,7 +335,7 @@ onMounted(() => {
           <button
             type="button"
             @click="showAddModal = true"
-            class="px-4 py-2 bg-brand-navy hover:bg-[#001442] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+            class="px-4 py-2 bg-brand-navy hover:bg-[#001442] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <i class="fa-solid fa-user-plus text-brand-gold"></i>
             <span>Tambah Siswa</span>
@@ -198,7 +364,7 @@ onMounted(() => {
                 </td>
               </tr>
               <tr
-                v-for="st in filteredStudents"
+                v-for="st in paginatedStudents"
                 :key="st.id"
                 class="hover:bg-slate-50/50 transition-colors"
               >
@@ -221,19 +387,112 @@ onMounted(() => {
                   <Badge :status="st.status || 'active'" />
                 </td>
                 <td class="px-6 py-4 text-right">
-                  <button
-                    type="button"
-                    @click="handleResetPassword(st)"
-                    class="px-2.5 py-1 text-slate-600 hover:text-amber-800 hover:bg-amber-50 border border-slate-200 rounded-lg text-xs font-medium transition-colors"
-                    title="Reset Password ke default '1234'"
-                  >
-                    <i class="fa-solid fa-key mr-1 text-brand-gold"></i>
-                    Reset Password
-                  </button>
+                  <div class="flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      @click="openEditModal(st)"
+                      class="px-2.5 py-1 text-brand-blue hover:text-[#0c4e85] hover:bg-blue-50 border border-blue-200/80 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Edit Data Siswa"
+                    >
+                      <i class="fa-solid fa-pen-to-square"></i>
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      @click="handleResetPassword(st)"
+                      class="px-2.5 py-1 text-slate-700 hover:text-amber-800 hover:bg-amber-50 border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Reset Password ke default '1234'"
+                    >
+                      <i class="fa-solid fa-key text-brand-gold"></i>
+                      <span>Reset</span>
+                    </button>
+                    <button
+                      type="button"
+                      @click="handleDeleteStudent(st)"
+                      class="px-2.5 py-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Hapus Data Siswa"
+                    >
+                      <i class="fa-solid fa-trash-can"></i>
+                      <span>Hapus</span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination Footer Bar (Centered & Spaced Away From Floating AI Widget) -->
+        <div class="px-6 py-4 bg-slate-50/75 border-t border-slate-100 flex flex-col md:flex-row items-center justify-center gap-4 sm:gap-6 text-xs text-slate-600">
+          <!-- Information Range & Limit Selector -->
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <span class="font-medium">
+              Menampilkan <span class="font-bold text-slate-900">{{ displayRangeStart }}-{{ displayRangeEnd }}</span> dari <span class="font-bold text-slate-900">{{ totalItems }}</span> siswa
+            </span>
+            <span v-if="searchQuery" class="text-[11px] text-brand-blue bg-blue-50 px-2 py-0.5 rounded-md font-semibold border border-blue-100">
+              (Terfilter dari {{ students.length }} total)
+            </span>
+
+            <!-- Per Page Selector -->
+            <div class="flex items-center gap-1.5 ml-2 bg-white px-2.5 py-1 border border-slate-200 rounded-lg shadow-2xs">
+              <span class="text-slate-500 font-semibold text-[11px]">Per hal:</span>
+              <select
+                v-model="perPage"
+                class="bg-transparent text-slate-800 font-bold focus:outline-hidden cursor-pointer text-xs"
+              >
+                <option :value="10">10</option>
+                <option :value="15">15</option>
+                <option :value="25">25</option>
+                <option :value="50">50</option>
+                <option :value="100">100</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Page Navigation Buttons (Centered) -->
+          <div class="flex items-center gap-1.5 justify-center">
+            <!-- Previous Page Button -->
+            <button
+              type="button"
+              @click="goToPage(currentPage - 1)"
+              :disabled="currentPage === 1"
+              class="px-3 py-1.5 rounded-lg border bg-white font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+            >
+              <i class="fa-solid fa-chevron-left text-[10px]"></i>
+              <span>Sebelumnya</span>
+            </button>
+
+            <!-- Page Number Buttons -->
+            <div class="flex items-center gap-1">
+              <template v-for="(p, idx) in visiblePages" :key="idx">
+                <span v-if="p === '...'" class="px-1 text-slate-400 font-bold">...</span>
+                <button
+                  v-else
+                  type="button"
+                  @click="goToPage(p as number)"
+                  :class="[
+                    'w-7.5 h-7.5 rounded-lg font-bold transition-all text-xs flex items-center justify-center cursor-pointer',
+                    currentPage === p
+                      ? 'bg-brand-navy text-white shadow-2xs ring-2 ring-brand-navy/20'
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                  ]"
+                >
+                  {{ p }}
+                </button>
+              </template>
+            </div>
+
+            <!-- Next Page Button -->
+            <button
+              type="button"
+              @click="goToPage(currentPage + 1)"
+              :disabled="currentPage === totalPages"
+              class="px-3 py-1.5 rounded-lg border bg-white font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+            >
+              <span>Berikutnya</span>
+              <i class="fa-solid fa-chevron-right text-[10px]"></i>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -370,6 +629,141 @@ onMounted(() => {
               class="px-5 py-2 font-bold text-white bg-brand-navy hover:bg-[#001442] rounded-xl shadow-xs"
             >
               Simpan Siswa
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <!-- Edit Student Modal -->
+      <Modal v-model="showEditModal" title="Edit Data Siswa" size="lg">
+        <form @submit.prevent="handleUpdateStudent" class="space-y-4 text-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap Siswa *</label>
+              <input
+                v-model="editForm.full_name"
+                type="text"
+                required
+                placeholder="Contoh: Muhammad Farhan"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue font-medium"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">NIS (Nomor Induk Siswa)</label>
+              <input
+                v-model="editForm.nis"
+                type="text"
+                disabled
+                class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 font-mono cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">NISN (10 Digit)</label>
+              <input
+                v-model="editForm.nisn"
+                type="text"
+                placeholder="0081234567"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue font-mono"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tingkat Kelas *</label>
+              <select
+                v-model="editForm.grade_level"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+              >
+                <option :value="7">Kelas 7 (SLTP)</option>
+                <option :value="8">Kelas 8 (SLTP)</option>
+                <option :value="9">Kelas 9 (SLTP)</option>
+                <option :value="10">Kelas 10 (SLTA)</option>
+                <option :value="11">Kelas 11 (SLTA)</option>
+                <option :value="12">Kelas 12 (SLTA)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nama Rombel / Kelas *</label>
+              <input
+                v-model="editForm.class_name"
+                type="text"
+                required
+                placeholder="Contoh: X MIPA 2"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue font-medium"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jenis Kelamin *</label>
+              <select
+                v-model="editForm.gender"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+              >
+                <option value="L">Laki-laki (L)</option>
+                <option value="P">Perempuan (P)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tempat Lahir</label>
+              <input
+                v-model="editForm.birth_place"
+                type="text"
+                placeholder="Contoh: Jombang"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tanggal Lahir</label>
+              <input
+                v-model="editForm.birth_date"
+                type="date"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor WhatsApp Siswa</label>
+              <input
+                v-model="editForm.phone_number"
+                type="text"
+                placeholder="0812..."
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Status Akun Siswa *</label>
+              <select
+                v-model="editForm.status"
+                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:border-brand-blue font-semibold text-slate-800"
+              >
+                <option value="active">Aktif</option>
+                <option value="graduated">Lulus</option>
+                <option value="transferred">Pindah Sekolah</option>
+                <option value="inactive">Non-Aktif</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              @click="showEditModal = false"
+              class="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              :disabled="updatingStudent"
+              class="px-5 py-2 font-bold text-white bg-brand-navy hover:bg-[#001442] rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <i v-if="updatingStudent" class="fa-solid fa-spinner fa-spin"></i>
+              <span>Simpan Perubahan</span>
             </button>
           </div>
         </form>

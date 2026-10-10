@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PublicLayout from '@/layouts/PublicLayout.vue'
 import Badge from '@/components/common/Badge.vue'
@@ -48,6 +48,53 @@ function formatDate(dateStr: string) {
     year: 'numeric',
   })
 }
+
+const schoolName = computed(() => {
+  if (!verificationData.value) return 'MA Unggulan K.H. Abd. Wahab Hasbulloh'
+  return (
+    verificationData.value.school?.name ||
+    verificationData.value.school_name ||
+    'MA Unggulan K.H. Abd. Wahab Hasbulloh'
+  )
+})
+
+const competitionName = computed(() => {
+  if (!verificationData.value) return '-'
+  return (
+    verificationData.value.achievement?.title ||
+    verificationData.value.achievement?.event_name ||
+    verificationData.value.competition?.title ||
+    verificationData.value.competition_name ||
+    '-'
+  )
+})
+
+const rankName = computed(() => {
+  if (!verificationData.value) return 'Juara'
+  return (
+    verificationData.value.achievement?.rank ||
+    verificationData.value.rank ||
+    'Juara'
+  )
+})
+
+const verifiedAtDate = computed(() => {
+  if (!verificationData.value) return '-'
+  const d =
+    verificationData.value.achievement?.verified_at ||
+    verificationData.value.verified_at
+  return formatDate(d)
+})
+
+const achievementScope = computed(() => {
+  if (!verificationData.value) return 'Nasional'
+  const lvl =
+    verificationData.value.achievement?.level ||
+    verificationData.value.competition?.level ||
+    verificationData.value.scope ||
+    'nasional'
+  return String(lvl).replace('_', ' ').toUpperCase()
+})
 
 onMounted(() => {
   if (inputPublicId.value) {
@@ -158,20 +205,20 @@ watch(() => route.params.public_id, (newVal) => {
                 <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Asal Instansi Sekolah</p>
                 <p class="text-base font-bold text-slate-800 flex items-center gap-1.5 mt-0.5">
                   <i class="fa-solid fa-school text-brand-navy"></i>
-                  {{ verificationData.school_name }}
+                  {{ schoolName }}
                 </p>
               </div>
 
               <div class="grid grid-cols-2 gap-4 pt-2">
                 <div>
                   <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Nama Kompetisi</p>
-                  <p class="text-xs font-bold text-slate-800 mt-0.5">{{ verificationData.competition_name }}</p>
+                  <p class="text-xs font-bold text-slate-800 mt-0.5">{{ competitionName }}</p>
                 </div>
                 <div>
                   <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Peringkat / Capaian</p>
                   <p class="text-xs font-extrabold text-amber-600 flex items-center gap-1 mt-0.5">
                     <i class="fa-solid fa-trophy text-brand-gold"></i>
-                    {{ verificationData.rank || 'Juara' }}
+                    {{ rankName }}
                   </p>
                 </div>
               </div>
@@ -179,11 +226,11 @@ watch(() => route.params.public_id, (newVal) => {
               <div class="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
                 <div>
                   <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Tanggal Terverifikasi</p>
-                  <p class="text-xs font-medium text-slate-700 mt-0.5">{{ formatDate(verificationData.verified_at) }}</p>
+                  <p class="text-xs font-medium text-slate-700 mt-0.5">{{ verifiedAtDate }}</p>
                 </div>
                 <div>
                   <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Tingkat Wilayah</p>
-                  <p class="text-xs font-medium text-slate-700 capitalize mt-0.5">{{ verificationData.scope || 'Nasional' }}</p>
+                  <p class="text-xs font-medium text-slate-700 mt-0.5">{{ achievementScope }}</p>
                 </div>
               </div>
             </div>

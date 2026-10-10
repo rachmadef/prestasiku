@@ -64,13 +64,10 @@ function handleLogout() {
 
         <!-- Desktop Right Actions -->
         <div class="hidden md:flex items-center gap-3">
-          <router-link
-            to="/school-registration"
-            class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl transition-colors"
-          >
-            <i class="fa-solid fa-school text-xs text-emerald-400"></i>
-            Daftarkan Sekolah
-          </router-link>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-300 bg-white/10 rounded-xl border border-white/15">
+            <i class="fa-solid fa-building-columns text-amber-400"></i>
+            MA Unggulan K.H. Abd. Wahab Hasbulloh
+          </span>
 
           <template v-if="authStore.isAuthenticated">
             <router-link
@@ -157,15 +154,6 @@ function handleLogout() {
                   <span>Cek QR Prestasi</span>
                 </router-link>
 
-                <router-link
-                  to="/school-registration"
-                  @click="mobileMenuOpen = false"
-                  active-class="bg-emerald-50 text-emerald-800 font-bold"
-                  class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50/70 transition-colors"
-                >
-                  <i class="fa-solid fa-school w-4 text-center text-emerald-600"></i>
-                  <span>Daftarkan Sekolah</span>
-                </router-link>
               </div>
 
               <div class="mt-2 pt-2 border-t border-slate-100">
