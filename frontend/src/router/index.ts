@@ -31,6 +31,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/public/DispensationVerificationView.vue'),
   },
   {
+    path: '/signer/verify/:token?',
+    name: 'signer.verify',
+    component: () => import('@/views/public/PublicSignerVerificationView.vue'),
+  },
+  {
     path: '/school-registration',
     redirect: '/login',
   },
@@ -144,6 +149,11 @@ const routes: RouteRecordRaw[] = [
         path: 'supervisors',
         name: 'school.supervisors',
         component: () => import('@/views/school/SchoolSupervisorsView.vue'),
+      },
+      {
+        path: 'signers',
+        name: 'school.signers',
+        component: () => import('@/views/school/SchoolSignersView.vue'),
       },
       {
         path: 'profile',

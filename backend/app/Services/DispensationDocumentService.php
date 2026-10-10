@@ -39,6 +39,20 @@ class DispensationDocumentService
 
         $qrCodeDataUri = $this->qrCodeService->generateDispensationDataUri($dispensation->verification_token, 180);
 
+        // Fetch active signers (Waka Kesiswaan & Guru PJ Lomba) for TTD berbasis QR Code
+        $wakaSigner = \App\Models\SchoolSigner::where('school_id', $school->id)
+            ->where('role_type', 'waka_kesiswaan')
+            ->where('is_active', true)
+            ->first();
+
+        $pjSigner = \App\Models\SchoolSigner::where('school_id', $school->id)
+            ->where('role_type', 'pj_lomba')
+            ->where('is_active', true)
+            ->first();
+
+        $wakaQrDataUri = $wakaSigner ? $this->qrCodeService->generateSignerDataUri($wakaSigner->signature_token, 130) : null;
+        $pjQrDataUri = $pjSigner ? $this->qrCodeService->generateSignerDataUri($pjSigner->signature_token, 130) : null;
+
         $pdf = Pdf::loadView('letters.dispensation_pdf', [
             'dispensation' => $dispensation,
             'school' => $school,
@@ -46,6 +60,10 @@ class DispensationDocumentService
             'letterheadImageBase64' => $letterheadImageBase64,
             'letterConfig' => $school->letter_format_config ?? [],
             'qrCodeDataUri' => $qrCodeDataUri,
+            'wakaSigner' => $wakaSigner,
+            'wakaQrDataUri' => $wakaQrDataUri,
+            'pjSigner' => $pjSigner,
+            'pjQrDataUri' => $pjQrDataUri,
         ]);
 
         $pdf->setPaper('a4', 'portrait');

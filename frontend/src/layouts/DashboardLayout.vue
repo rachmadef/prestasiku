@@ -82,6 +82,7 @@ const menuGroups = computed<MenuGroup[]>(() => {
         items: [
           { label: 'Dashboard Sekolah', path: '/school/dashboard', icon: 'fa-solid fa-gauge-high' },
           { label: 'Verifikasi Perizinan & Dispensasi', path: '/school/dispensations', icon: 'fa-solid fa-file-signature' },
+          { label: 'Guru TTD Dispen & QR', path: '/school/signers', icon: 'fa-solid fa-qrcode' },
           { label: 'Pendamping & Bisyaroh', path: '/school/supervisors', icon: 'fa-solid fa-user-gear' },
         ],
       },

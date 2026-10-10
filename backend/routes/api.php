@@ -22,6 +22,8 @@ use App\Http\Controllers\Api\V1\Student\StudentRegistrationController;
 use App\Http\Controllers\Api\V1\Student\StudentPermissionController;
 use App\Http\Controllers\Api\V1\School\SchoolSupervisorController;
 use App\Http\Controllers\Api\V1\School\SchoolPermissionController;
+use App\Http\Controllers\Api\V1\School\SchoolSignerController;
+use App\Http\Controllers\Api\V1\Public\PublicSignerVerificationController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -78,6 +80,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/dispensations/verify/{token}', [PublicDispensationVerificationController::class, 'verify'])
         ->middleware('throttle:60,1')
         ->name('dispensations.verify');
+
+    // Public QR Verification for Teacher/Signer TTD
+    Route::get('/signers/verify/{token}', [PublicSignerVerificationController::class, 'verify'])
+        ->middleware('throttle:60,1')
+        ->name('signers.verify');
 
     // -------------------------------------------------------------
     // Protected Endpoints (Sanctum + Active User + Password Changed + Throttled)
@@ -245,6 +252,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/supervisors/{id}', [SchoolSupervisorController::class, 'show'])->name('supervisors.show');
             Route::put('/supervisors/{id}', [SchoolSupervisorController::class, 'update'])->name('supervisors.update');
             Route::delete('/supervisors/{id}', [SchoolSupervisorController::class, 'destroy'])->name('supervisors.destroy');
+
+            // Guru Penandatangan Dispen (Waka Kesiswaan & Guru PJ Lomba/Olimpiade)
+            Route::get('/signers', [SchoolSignerController::class, 'index'])->name('signers.index');
+            Route::post('/signers', [SchoolSignerController::class, 'store'])->name('signers.store');
+            Route::get('/signers/{id}', [SchoolSignerController::class, 'show'])->name('signers.show');
+            Route::put('/signers/{id}', [SchoolSignerController::class, 'update'])->name('signers.update');
+            Route::delete('/signers/{id}', [SchoolSignerController::class, 'destroy'])->name('signers.destroy');
+            Route::get('/signers/{id}/qr', [SchoolSignerController::class, 'qr'])->name('signers.qr');
         });
     });
 });

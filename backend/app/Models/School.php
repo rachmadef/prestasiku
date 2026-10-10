@@ -75,6 +75,11 @@ class School extends Model
         return $this->hasMany(KbmDispensation::class);
     }
 
+    public function signers(): HasMany
+    {
+        return $this->hasMany(SchoolSigner::class);
+    }
+
     public function verifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
