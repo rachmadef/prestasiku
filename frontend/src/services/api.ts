@@ -1,7 +1,17 @@
 import axios from 'axios'
 
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/+$/, '')
+export const STORAGE_BASE_URL = (import.meta.env.VITE_STORAGE_BASE_URL || (import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace(/\/api(\/v1)?\/?$/, '') + '/storage' : '/storage')).replace(/\/+$/, '')
+
+export function getStorageUrl(path: string | null | undefined): string | null {
+  if (!path) return null
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  const cleanPath = path.replace(/^\/+/, '')
+  return `${STORAGE_BASE_URL}/${cleanPath}`
+}
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_BASE_URL,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json',

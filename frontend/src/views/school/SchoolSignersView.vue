@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import Modal from '@/components/common/Modal.vue'
-import api from '@/services/api'
+import api, { getStorageUrl } from '@/services/api'
 
 interface Signer {
   id: number
@@ -129,7 +129,7 @@ function openEditModal(signer: Signer) {
   isEditing.value = true
   currentSignerId.value = signer.id
   selectedPhotoFile.value = null
-  photoPreviewUrl.value = signer.photo_path ? `/storage/${signer.photo_path}` : null
+  photoPreviewUrl.value = getStorageUrl(signer.photo_path)
   formData.value = {
     name: signer.name,
     nip: signer.nip || '',

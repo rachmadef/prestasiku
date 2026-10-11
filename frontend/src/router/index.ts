@@ -36,6 +36,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/public/PublicSignerVerificationView.vue'),
   },
   {
+    path: '/form-pendamping',
+    name: 'public.supervisor-form',
+    component: () => import('@/views/public/PublicSupervisorFormView.vue'),
+  },
+  {
     path: '/school-registration',
     redirect: '/login',
   },

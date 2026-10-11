@@ -86,6 +86,20 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ->middleware('throttle:60,1')
         ->name('signers.verify');
 
+    // Public Form Pendamping Perlombaan (Direct Link Tanpa Login)
+    Route::get('/public/supervisor-form/options', [\App\Http\Controllers\Api\V1\Public\PublicSupervisorController::class, 'getOptions'])
+        ->middleware('throttle:60,1')
+        ->name('public.supervisor-form.options');
+    Route::post('/public/supervisor-form/submit', [\App\Http\Controllers\Api\V1\Public\PublicSupervisorController::class, 'submit'])
+        ->middleware('throttle:30,1')
+        ->name('public.supervisor-form.submit');
+    Route::get('/public/supervisor-form/{token}', [\App\Http\Controllers\Api\V1\Public\PublicSupervisorController::class, 'show'])
+        ->name('public.supervisor-form.show');
+    Route::get('/public/supervisor-form/{token}/download-docx', [\App\Http\Controllers\Api\V1\Public\PublicSupervisorController::class, 'downloadDocx'])
+        ->name('public.supervisor-form.download-docx');
+    Route::get('/public/supervisor-form/{token}/download-pdf', [\App\Http\Controllers\Api\V1\Public\PublicSupervisorController::class, 'downloadPdf'])
+        ->name('public.supervisor-form.download-pdf');
+
     // -------------------------------------------------------------
     // Protected Endpoints (Sanctum + Active User + Password Changed + Throttled)
     // -------------------------------------------------------------
@@ -252,6 +266,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/supervisors/{id}', [SchoolSupervisorController::class, 'show'])->name('supervisors.show');
             Route::put('/supervisors/{id}', [SchoolSupervisorController::class, 'update'])->name('supervisors.update');
             Route::delete('/supervisors/{id}', [SchoolSupervisorController::class, 'destroy'])->name('supervisors.destroy');
+            Route::get('/supervisors/{id}/print-letter', [SchoolSupervisorController::class, 'printLetter'])->name('supervisors.print-letter');
+            Route::get('/supervisors/{id}/download-docx', [SchoolSupervisorController::class, 'downloadDocx'])->name('supervisors.download-docx');
+            Route::get('/supervisors/{id}/download-pdf', [SchoolSupervisorController::class, 'downloadPdf'])->name('supervisors.download-pdf');
 
             // Guru Penandatangan Dispen (Waka Kesiswaan & Guru PJ Lomba/Olimpiade)
             Route::get('/signers', [SchoolSignerController::class, 'index'])->name('signers.index');
