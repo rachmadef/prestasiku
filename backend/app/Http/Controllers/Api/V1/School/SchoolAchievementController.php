@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\School;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\School\StoreSchoolAchievementRequest;
+use App\Http\Requests\School\UpdateSchoolAchievementRequest;
 use App\Http\Requests\School\VerifyAchievementRequest;
 use App\Models\Achievement;
 use App\Models\Student;
@@ -156,6 +157,93 @@ class SchoolAchievementController extends Controller
         return response()->json([
             'success' => true,
             'data' => $data,
+        ]);
+    }
+
+    /**
+     * Update an achievement.
+     */
+    public function update(UpdateSchoolAchievementRequest $request, Achievement $achievement): JsonResponse
+    {
+        Gate::authorize('update', $achievement);
+
+        $validated = $request->validated();
+
+        if (isset($validated['student_id'])) {
+            $student = Student::findOrFail($validated['student_id']);
+            $achievement->student_id = $student->id;
+            $achievement->school_id = $student->school_id;
+        }
+
+        if (isset($validated['title'])) $achievement->title = $validated['title'];
+        if (isset($validated['level'])) $achievement->level = $validated['level'];
+        if (isset($validated['rank'])) $achievement->rank = $validated['rank'];
+        if (isset($validated['event_name'])) $achievement->event_name = $validated['event_name'];
+        if (isset($validated['organizer_name'])) $achievement->organizer_name = $validated['organizer_name'];
+        if (isset($validated['event_date'])) $achievement->event_date = $validated['event_date'];
+        if (array_key_exists('competition_id', $validated)) $achievement->competition_id = $validated['competition_id'];
+        if (isset($validated['is_public'])) $achievement->is_public = (bool)$validated['is_public'];
+
+        if (isset($validated['status'])) {
+            $prevStatus = $achievement->status;
+            $achievement->status = $validated['status'];
+            if ($validated['status'] === 'verified' && ($prevStatus !== 'verified' || ! $achievement->verified_at)) {
+                $achievement->verified_by = $request->user()->id;
+                $achievement->verified_at = now();
+            }
+        }
+
+        $achievement->save();
+
+        if ($request->hasFile('certificate_file')) {
+            $file = $request->file('certificate_file');
+            $fileName = $file->getClientOriginalName();
+            $path = $file->store("achievements/{$achievement->id}", 'local');
+
+            $achievement->documents()->create([
+                'document_type' => $validated['document_type'] ?? 'certificate',
+                'document_number' => $validated['document_number'] ?? null,
+                'file_path' => $path,
+                'external_url' => $validated['external_url'] ?? null,
+                'file_name' => $fileName,
+                'file_size' => $file->getSize(),
+                'file_mime' => $file->getMimeType(),
+            ]);
+        } elseif (! empty($validated['external_url'])) {
+            $achievement->documents()->create([
+                'document_type' => $validated['document_type'] ?? 'result_link',
+                'document_number' => $validated['document_number'] ?? null,
+                'external_url' => $validated['external_url'],
+            ]);
+        }
+
+        $achievement->load(['student.user', 'competition', 'documents']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data prestasi siswa berhasil diperbarui.',
+            'data' => $achievement,
+        ]);
+    }
+
+    /**
+     * Delete an achievement.
+     */
+    public function destroy(Achievement $achievement): JsonResponse
+    {
+        Gate::authorize('delete', $achievement);
+
+        foreach ($achievement->documents as $doc) {
+            if ($doc->file_path && Storage::disk('local')->exists($doc->file_path)) {
+                Storage::disk('local')->delete($doc->file_path);
+            }
+        }
+
+        $achievement->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Prestasi siswa berhasil dihapus.',
         ]);
     }
 

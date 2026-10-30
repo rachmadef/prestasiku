@@ -14,7 +14,12 @@ class PublicDispensationVerificationController extends Controller
      */
     public function verify(string $token): JsonResponse
     {
-        $dispensation = KbmDispensation::where('verification_token', $token)
+        $cleanToken = trim($token);
+
+        $dispensation = KbmDispensation::where(function ($query) use ($cleanToken) {
+            $query->where('verification_token', $cleanToken)
+                ->orWhere('reference_number', $cleanToken);
+        })
             ->with([
                 'school:id,name,npsn,address,phone,email',
                 'students:id,full_name,nis,class_name,gender',

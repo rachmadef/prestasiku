@@ -256,6 +256,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/achievements', [SchoolAchievementController::class, 'index'])->name('achievements.index');
             Route::post('/achievements', [SchoolAchievementController::class, 'store'])->name('achievements.store');
             Route::get('/achievements/{achievement}', [SchoolAchievementController::class, 'show'])->name('achievements.show');
+            Route::match(['put', 'patch', 'post'], '/achievements/{achievement}', [SchoolAchievementController::class, 'update'])->name('achievements.update');
+            Route::delete('/achievements/{achievement}', [SchoolAchievementController::class, 'destroy'])->name('achievements.destroy');
             Route::post('/achievements/{achievement}/verify', [SchoolAchievementController::class, 'verify'])->name('achievements.verify');
             Route::get('/achievements/{achievement}/documents/{document}', [SchoolAchievementController::class, 'downloadDocument'])->name('achievements.documents.download');
 

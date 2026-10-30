@@ -38,7 +38,7 @@ async function handleLogin() {
 function fillCredentials(type: 'admin' = 'admin') {
   errorMessage.value = null
   if (type === 'admin') {
-    identifier.value = 'superadmin@prestasiku.id'
+    identifier.value = 'superadmin'
     password.value = 'password'
   }
 }
@@ -192,19 +192,6 @@ function fillCredentials(type: 'admin' = 'admin') {
               </button>
             </div>
           </form>
-
-          <!-- Quick Fill Super Admin -->
-          <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span class="text-[11px] text-slate-400 font-medium">Akses Cepat:</span>
-            <button
-              type="button"
-              @click="fillCredentials('admin')"
-              class="px-3 py-1 rounded-full text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <i class="fa-solid fa-shield-halved text-brand-navy text-[10px]"></i>
-              <span>Super Admin</span>
-            </button>
-          </div>
 
           <!-- Bottom Navigation -->
           <div class="pt-1 text-center">

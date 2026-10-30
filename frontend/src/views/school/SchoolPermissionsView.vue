@@ -33,7 +33,7 @@ async function fetchData() {
   try {
     const [permRes, studRes] = await Promise.all([
       api.get('/school/permissions'),
-      api.get('/school/students').catch(() => ({ data: { data: [] } })),
+      api.get('/school/students?all=1').catch(() => ({ data: { data: [] } })),
     ])
     permissions.value = extractList(permRes.data.data)
     students.value = extractList(studRes.data.data)

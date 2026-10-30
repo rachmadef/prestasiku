@@ -12,6 +12,13 @@ class StoreSchoolAchievementRequest extends FormRequest
         return $this->user() && ($this->user()->isSchoolAdmin() || $this->user()->isSuperAdmin());
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->level === 'kabupaten') {
+            $this->merge(['level' => 'kota_kabupaten']);
+        }
+    }
+
     public function rules(): array
     {
         return [

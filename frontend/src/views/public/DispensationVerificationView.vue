@@ -1,24 +1,32 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import PublicLayout from '@/layouts/PublicLayout.vue'
+import QrScannerModal from '@/components/common/QrScannerModal.vue'
 import api from '@/services/api'
 import { formatDateIndo, formatDateRange } from '@/utils/date'
 
 const route = useRoute()
-const token = ref((route.params.token as string) || '')
-const inputToken = ref('')
+const router = useRouter()
+
+const token = ref((route.params.token as string) || (route.query.token as string) || '')
+const inputToken = ref(token.value)
 const loading = ref(false)
 const verificationResult = ref<any>(null)
 const errorMsg = ref('')
+const showScannerModal = ref(false)
 
 async function verifyToken(t: string) {
-  if (!t) return
+  if (!t.trim()) return
   loading.value = true
   errorMsg.value = ''
   verificationResult.value = null
 
+  const cleanToken = t.trim()
+  inputToken.value = cleanToken
+
   try {
-    const res = await api.get(`/dispensations/verify/${t}`)
+    const res = await api.get(`/dispensations/verify/${encodeURIComponent(cleanToken)}`)
     verificationResult.value = res.data.data
   } catch (err: any) {
     errorMsg.value = err.response?.data?.message || 'Kode verifikasi QR tidak valid atau surat dispensasi tidak ditemukan di database sekolah.'
@@ -27,55 +35,124 @@ async function verifyToken(t: string) {
   }
 }
 
+function handleSearch() {
+  if (inputToken.value.trim()) {
+    const cleanToken = inputToken.value.trim()
+    router.push(`/dispensasi/verifikasi/${encodeURIComponent(cleanToken)}`)
+    verifyToken(cleanToken)
+  }
+}
+
+function handleQrScanned(result: { code: string; raw: string; isUrl: boolean }) {
+  const code = result.code
+  const raw = result.raw.toLowerCase()
+
+  // If scanned code is an achievement ID, redirect to achievement verification
+  if (code.startsWith('PKU-ACH-') || raw.includes('/verify/pku-ach-') || raw.includes('/verify/pku_ach_')) {
+    router.push(`/verify/${encodeURIComponent(code)}`)
+    return
+  }
+
+  // Handle as dispensation token
+  inputToken.value = code
+  router.push(`/dispensasi/verifikasi/${encodeURIComponent(code)}`)
+  verifyToken(code)
+}
+
 onMounted(() => {
   if (token.value) {
     verifyToken(token.value)
   }
 })
+
+watch(() => route.params.token, (newVal) => {
+  if (newVal) {
+    token.value = newVal as string
+    inputToken.value = newVal as string
+    verifyToken(newVal as string)
+  }
+})
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F3F1EF] py-8 px-4 sm:px-6 lg:px-8 font-sans text-slate-800">
-    <div class="max-w-xl mx-auto space-y-6">
-      <!-- Official Header -->
-      <div class="text-center space-y-2">
-        <router-link to="/" class="inline-flex items-center gap-2.5">
-          <img src="/img/icon-main.png" alt="PrestasiKu" class="h-10 w-auto" />
-          <img src="/img/text-main.png" alt="PrestasiKu" class="h-6 w-auto" />
+  <PublicLayout>
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <!-- Mode Switcher Tabs (Prestasi vs Dispensasi) -->
+      <div class="flex items-center justify-center gap-2 mb-8">
+        <router-link
+          to="/verify"
+          class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-600 hover:text-brand-navy hover:bg-slate-100 border border-slate-200 transition-all flex items-center gap-2"
+        >
+          <i class="fa-solid fa-trophy text-amber-500"></i>
+          <span>Cek QR Prestasi</span>
         </router-link>
-        <p class="text-[11px] uppercase tracking-wider font-bold text-slate-500">
-          Sistem Verifikasi Keabsahan Surat Dispensasi Belajar (KBM)
+        <router-link
+          to="/dispensasi/verifikasi"
+          class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-navy text-white shadow-xs flex items-center gap-2"
+        >
+          <i class="fa-solid fa-file-signature text-emerald-400"></i>
+          <span>Cek Validasi Dispensasi</span>
+        </router-link>
+      </div>
+
+      <!-- Page Header -->
+      <div class="text-center max-w-xl mx-auto mb-8 space-y-2">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
+          <i class="fa-solid fa-shield-check text-emerald-600"></i>
+          <span>Verifikasi Surat Dispensasi Belajar (KBM)</span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Cek Keabsahan Dispensasi</h1>
+        <p class="text-xs sm:text-sm text-slate-600">
+          Pindai QR Code dari surat dispensasi atau masukkan kode token verifikasi / nomor surat untuk memvalidasi izin resmi KBM siswa.
         </p>
       </div>
 
-      <!-- Manual Input Box if no token in URL -->
-      <div v-if="!token" class="bg-white rounded-xl p-5 shadow-xs border border-slate-200">
-        <label class="block text-xs font-bold text-slate-700 mb-1.5">Masukkan Kode Token Verifikasi:</label>
-        <div class="flex gap-2">
+      <!-- Search Input Box & Cam Scanner Button -->
+      <div class="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/80 shadow-md mb-8 max-w-2xl mx-auto">
+        <form @submit.prevent="handleSearch" class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div class="pl-2 text-slate-400">
+            <i class="fa-solid fa-file-lines text-lg"></i>
+          </div>
           <input
             v-model="inputToken"
             type="text"
-            placeholder="Contoh kode token dari surat..."
-            class="flex-1 text-xs rounded-lg border border-slate-300 p-2.5 focus:border-brand-navy focus:outline-hidden"
+            placeholder="Kode token QR atau Nomor Surat dispensasi..."
+            class="flex-1 bg-transparent border-none text-xs sm:text-sm font-semibold tracking-wide text-slate-800 placeholder-slate-400 focus:outline-hidden py-2 min-w-[200px]"
           />
-          <button
-            type="button"
-            @click="verifyToken(inputToken)"
-            class="px-4 py-2.5 bg-brand-navy text-white text-xs font-bold rounded-lg hover:bg-[#00164a] transition-all cursor-pointer"
-          >
-            Verifikasi
-          </button>
-        </div>
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <!-- Cam Scanner Button -->
+            <button
+              type="button"
+              @click="showScannerModal = true"
+              class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+              title="Buka Kamera untuk Scan QR Surat"
+            >
+              <i class="fa-solid fa-camera"></i>
+              <span>Scan Kamera</span>
+            </button>
+
+            <!-- Submit Button -->
+            <button
+              type="submit"
+              :disabled="loading"
+              class="px-5 py-2.5 bg-brand-navy hover:bg-[#001442] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              <i v-if="loading" class="fa-solid fa-spinner fa-spin"></i>
+              <i v-else class="fa-solid fa-magnifying-glass"></i>
+              <span>Validasi</span>
+            </button>
+          </div>
+        </form>
       </div>
 
       <!-- Loading State -->
-      <div v-if="loading" class="bg-white rounded-xl p-10 text-center shadow-xs border border-slate-200">
+      <div v-if="loading" class="bg-white rounded-2xl p-10 text-center shadow-xs border border-slate-200 max-w-xl mx-auto space-y-3">
         <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-navy"></i>
-        <p class="text-xs text-slate-500 mt-2 font-medium">Memverifikasi keabsahan dokumen di basis data sekolah...</p>
+        <p class="text-xs text-slate-500 font-medium">Memverifikasi keabsahan dokumen di basis data sekolah...</p>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="errorMsg" class="bg-white rounded-xl p-8 text-center shadow-xs border border-rose-200 space-y-3">
+      <div v-else-if="errorMsg" class="bg-white rounded-2xl p-8 text-center shadow-xs border border-rose-200 space-y-3 max-w-xl mx-auto">
         <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-xl">
           <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
@@ -84,7 +161,7 @@ onMounted(() => {
       </div>
 
       <!-- Official Verified Certificate Result -->
-      <div v-else-if="verificationResult" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div v-else-if="verificationResult" class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden max-w-2xl mx-auto">
         <!-- Verification Banner Header -->
         <div
           :class="[
@@ -116,13 +193,13 @@ onMounted(() => {
             </span>
             <span
               v-else-if="verificationResult.period_status === 'completed'"
-              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white"
             >
               Masa Berlaku Izin Telah Berakhir
             </span>
             <span
               v-else
-              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white"
             >
               Izin Mulai Berlaku: {{ formatDateIndo(verificationResult.start_date) }}
             </span>
@@ -219,6 +296,14 @@ onMounted(() => {
           </p>
         </div>
       </div>
+
+      <!-- QR Camera Scanner Modal -->
+      <QrScannerModal
+        v-model="showScannerModal"
+        title="Scan QR Code Surat Dispensasi"
+        subtitle="Arahkan kamera ke kode QR yang tertera pada lembar surat dispensasi"
+        @scanned="handleQrScanned"
+      />
     </div>
-  </div>
+  </PublicLayout>
 </template>

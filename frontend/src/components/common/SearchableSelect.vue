@@ -58,6 +58,10 @@ const filteredOptions = computed(() => {
   })
 })
 
+const displayedOptions = computed(() => {
+  return filteredOptions.value.slice(0, 80)
+})
+
 function toggleDropdown() {
   if (props.disabled) return
   if (isOpen.value) {
@@ -257,7 +261,7 @@ onUnmounted(() => {
             </button>
           </div>
           <div v-if="filteredOptions.length > 0" class="flex items-center justify-between px-1 mt-1 text-[10px] text-slate-400">
-            <span>Ditemukan {{ filteredOptions.length }} pilihan</span>
+            <span>Ditemukan {{ filteredOptions.length }} pilihan <span v-if="filteredOptions.length > 80" class="text-brand-blue font-semibold">(menampilkan 80 teratas)</span></span>
             <span class="italic">Tekan Enter untuk memilih</span>
           </div>
         </div>
@@ -274,7 +278,7 @@ onUnmounted(() => {
           </div>
 
           <div
-            v-for="(opt, idx) in filteredOptions"
+            v-for="(opt, idx) in displayedOptions"
             :key="opt.value"
             @click="selectOption(opt)"
             @mouseenter="highlightedIndex = idx"
@@ -313,6 +317,9 @@ onUnmounted(() => {
             >
               <i class="fa-solid fa-check"></i>
             </div>
+          </div>
+                <div v-if="filteredOptions.length > 80" class="p-2.5 text-center text-[10px] text-slate-500 bg-slate-50 border-t border-slate-100 rounded-b-xl">
+            <span>+ {{ filteredOptions.length - 80 }} pilihan lainnya. Ketik nama siswa atau NIS di kolom pencarian untuk menyaring.</span>
           </div>
         </div>
       </div>

@@ -127,106 +127,130 @@ onUnmounted(() => {
 <template>
   <PublicLayout>
     <!-- Dignified Academic Hero Section (Clean, Iconic, Humanized) -->
-    <section class="bg-white border-b border-slate-200 pt-12 pb-16 lg:pt-16 lg:pb-24">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <!-- Left Column: Purpose & Introduction -->
+    <!-- Dignified Academic Hero Section (Clean, Modern, Solidroad Inspired) -->
+    <section class="relative bg-gradient-to-b from-slate-100/80 via-slate-50/40 to-white border-b border-slate-200/80 pt-8 pb-16 lg:pt-12 lg:pb-20 overflow-hidden">
+      <!-- Ambient Lighting Glows for Visual Depth & Notch Tab Contrast -->
+      <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[850px] h-[350px] bg-gradient-to-r from-blue-200/40 via-emerald-100/35 to-amber-100/40 blur-3xl pointer-events-none rounded-full"></div>
+      <div class="absolute top-24 -left-24 w-80 h-80 bg-blue-100/40 blur-3xl pointer-events-none rounded-full"></div>
+      <div class="absolute top-36 -right-24 w-80 h-80 bg-emerald-100/40 blur-3xl pointer-events-none rounded-full"></div>
+
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          <!-- Left Column: Purpose, Headline & Sleek Quick Validation Input -->
           <div class="lg:col-span-7 space-y-6 text-left">
-            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-brand-navy text-xs font-bold">
-              <span class="w-2 h-2 rounded-full bg-brand-gold"></span>
-              <span>Buku Prestasi — MA Unggulan K.H. Abd. Wahab Hasbulloh</span>
+            <!-- Institutional Pill Badge -->
+            <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/90 border border-slate-200/90 shadow-2xs text-slate-800 text-xs font-semibold backdrop-blur-xs">
+              <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="text-slate-700 font-medium">Buku Prestasi Resmi &bull;</span>
+              <span class="font-bold text-slate-900">MA Unggulan K.H. Abd. Wahab Hasbulloh</span>
             </div>
 
-            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-brand-navy tracking-tight leading-[1.18]">
+            <!-- Modern Bold Academic Headline -->
+            <h1 class="text-3xl sm:text-4xl lg:text-[46px] font-black text-slate-900 tracking-tight leading-[1.15]">
               Jejak Prestasi Terdata.
-              <span class="text-brand-blue block mt-1">Izin Belajar Terjaga.</span>
+              <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-brand-blue to-emerald-600 block mt-1">
+                Izin Belajar Terjaga.
+              </span>
             </h1>
 
             <p class="text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
-              Buku induk keikutsertaan lomba dan izin dispensasi KBM digital berbasis QR resmi MA Unggulan K.H. Abd. Wahab Hasbulloh.
+              Platform terpadu buku induk rekam keikutsertaan kompetisi siswa dan penerbitan surat izin dispensasi KBM digital resmi madrasah berbasis verifikasi QR Code.
             </p>
 
-            <!-- Action buttons -->
-            <div class="pt-2 flex flex-wrap items-center gap-3">
+            <!-- Action Pill Buttons (Aligned with Solidroad Green Pill Style) -->
+            <div class="pt-1 flex flex-wrap items-center gap-3">
               <router-link
                 to="/login"
-                class="px-6 py-3 bg-brand-navy hover:bg-[#001442] text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-2"
+                class="px-6 py-3 bg-[#10b981] hover:bg-[#059669] text-white font-bold text-xs sm:text-[13px] rounded-full shadow-sm hover:shadow-md transition-all flex items-center gap-2 group cursor-pointer"
               >
-                <i class="fa-solid fa-right-to-bracket text-brand-gold"></i>
+                <i class="fa-solid fa-right-to-bracket text-xs"></i>
                 <span>Masuk Portal Akses</span>
+                <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-0.5 transition-transform"></i>
               </router-link>
+
               <router-link
                 to="/competitions"
-                class="px-6 py-3 bg-[#F3F1EF] hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 transition-colors flex items-center gap-2"
+                class="px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-[13px] rounded-full border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex items-center gap-2"
               >
-                <i class="fa-solid fa-trophy text-brand-blue"></i>
+                <i class="fa-solid fa-trophy text-amber-500 text-xs"></i>
                 <span>Katalog Kompetisi</span>
+              </router-link>
+
+              <router-link
+                to="/verify"
+                class="px-4 py-3 text-slate-600 hover:text-slate-900 font-bold text-xs sm:text-[13px] flex items-center gap-1.5 transition-colors"
+              >
+                <i class="fa-solid fa-qrcode text-emerald-600 text-xs"></i>
+                <span>Scan Cek QR</span>
               </router-link>
             </div>
 
-            <!-- Quick Verification Input for Teachers / Inspectors -->
-            <div class="pt-3 max-w-md">
-              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                Validasi Cepat Surat Dispensasi:
-              </label>
-              <form @submit.prevent="handleVerifySubmit" class="flex items-center gap-2">
-                <div class="relative flex-1">
-                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">
-                    <i class="fa-solid fa-qrcode"></i>
-                  </span>
-                  <input
-                    v-model="verifyTokenInput"
-                    type="text"
-                    placeholder="Ketik token verifikasi..."
-                    class="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-hidden focus:border-brand-blue font-mono"
-                  />
+            <!-- Unified Quick Validation Search Pill Bar (Solidroad Pill Search Style) -->
+            <div class="pt-2 max-w-lg">
+              <form @submit.prevent="handleVerifySubmit" class="p-1.5 bg-white border border-slate-200/90 rounded-full shadow-sm hover:shadow-md transition-all flex items-center gap-2 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
+                <div class="pl-4 flex items-center text-emerald-600">
+                  <i class="fa-solid fa-qrcode text-sm"></i>
                 </div>
+                <input
+                  v-model="verifyTokenInput"
+                  type="text"
+                  placeholder="Validasi cepat: ketik token verifikasi / nomor surat..."
+                  class="w-full bg-transparent border-none text-xs sm:text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-hidden py-1.5"
+                />
                 <button
                   type="submit"
-                  class="px-4 py-2 bg-brand-blue hover:bg-[#0c4e85] text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
+                  class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
-                  Periksa
+                  <span>Periksa</span>
+                  <i class="fa-solid fa-arrow-right text-[9px]"></i>
                 </button>
               </form>
+              <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-2 pl-4">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>Verifikasi instan keaslian sertifikat & izin dispensasi resmi tanpa login</span>
+              </div>
             </div>
 
-            <!-- Real-Time Statistics Counter Cards -->
-            <div class="pt-5 border-t border-slate-100 mt-5">
+            <!-- Real-Time Statistics Counter Cards (Clean, Cohesive, Modern) -->
+            <div class="pt-5 border-t border-slate-200/60 mt-4">
               <div class="grid grid-cols-3 gap-3">
-                <div class="p-3 bg-slate-50 border border-slate-200/90 rounded-xl text-left shadow-2xs">
+                <!-- Stat 1: Siswa -->
+                <div class="p-3.5 sm:p-4 bg-white/90 backdrop-blur-xs border border-slate-200/80 rounded-2xl text-left shadow-2xs hover:shadow-xs transition-shadow">
                   <div class="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">
-                    <i class="fa-solid fa-user-graduate text-brand-navy"></i>
+                    <i class="fa-solid fa-user-graduate text-blue-600"></i>
                     <span>Siswa Terdata</span>
                   </div>
-                  <div class="text-xl sm:text-2xl font-black text-brand-navy">
+                  <div class="text-xl sm:text-2xl font-black text-slate-900">
                     <span v-if="statsLoading" class="inline-block w-12 h-6 bg-slate-200 animate-pulse rounded-md"></span>
                     <span v-else>{{ stats.total_students.toLocaleString('id-ID') }}</span>
                   </div>
-                  <div class="text-[10px] text-slate-500 mt-0.5 font-medium">Buku Induk Digital</div>
+                  <div class="text-[10px] text-slate-400 mt-0.5 font-medium">Buku Induk Digital</div>
                 </div>
 
-                <div class="p-3 bg-amber-50/70 border border-amber-200/90 rounded-xl text-left shadow-2xs">
-                  <div class="flex items-center gap-1.5 text-amber-800 text-[10px] font-bold uppercase tracking-wider mb-1">
-                    <i class="fa-solid fa-trophy text-brand-gold"></i>
+                <!-- Stat 2: Prestasi -->
+                <div class="p-3.5 sm:p-4 bg-white/90 backdrop-blur-xs border border-slate-200/80 rounded-2xl text-left shadow-2xs hover:shadow-xs transition-shadow">
+                  <div class="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-trophy text-amber-500"></i>
                     <span>Rekam Prestasi</span>
                   </div>
-                  <div class="text-xl sm:text-2xl font-black text-brand-navy">
-                    <span v-if="statsLoading" class="inline-block w-12 h-6 bg-amber-200/50 animate-pulse rounded-md"></span>
+                  <div class="text-xl sm:text-2xl font-black text-slate-900">
+                    <span v-if="statsLoading" class="inline-block w-12 h-6 bg-slate-200 animate-pulse rounded-md"></span>
                     <span v-else>{{ stats.total_achievements.toLocaleString('id-ID') }}</span>
                   </div>
-                  <div class="text-[10px] text-amber-800/80 mt-0.5 font-medium">Juara & Finalis</div>
+                  <div class="text-[10px] text-slate-400 mt-0.5 font-medium">Juara & Finalis</div>
                 </div>
 
-                <div class="p-3 bg-blue-50/70 border border-blue-200/90 rounded-xl text-left shadow-2xs">
-                  <div class="flex items-center gap-1.5 text-brand-blue text-[10px] font-bold uppercase tracking-wider mb-1">
-                    <i class="fa-solid fa-compass text-brand-blue"></i>
+                <!-- Stat 3: Kompetisi -->
+                <div class="p-3.5 sm:p-4 bg-white/90 backdrop-blur-xs border border-slate-200/80 rounded-2xl text-left shadow-2xs hover:shadow-xs transition-shadow">
+                  <div class="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-compass text-emerald-600"></i>
                     <span>Katalog Lomba</span>
                   </div>
-                  <div class="text-xl sm:text-2xl font-black text-brand-navy">
-                    <span v-if="statsLoading" class="inline-block w-12 h-6 bg-blue-200/50 animate-pulse rounded-md"></span>
+                  <div class="text-xl sm:text-2xl font-black text-slate-900">
+                    <span v-if="statsLoading" class="inline-block w-12 h-6 bg-slate-200 animate-pulse rounded-md"></span>
                     <span v-else>{{ stats.total_competitions.toLocaleString('id-ID') }}</span>
                   </div>
-                  <div class="text-[10px] text-brand-blue/80 mt-0.5 font-medium">Kompetisi Resmi</div>
+                  <div class="text-[10px] text-slate-400 mt-0.5 font-medium">Kompetisi Resmi</div>
                 </div>
               </div>
             </div>
@@ -235,12 +259,12 @@ onUnmounted(() => {
           <!-- Right Column: Student Achievement Showcase (Slide Foto Juara) -->
           <div class="lg:col-span-5">
             <div
-              class="relative rounded-2xl border-2 border-slate-200 bg-white p-2.5 shadow-md group"
+              class="relative rounded-[26px] border border-slate-200/90 bg-white p-2.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.12)] group transition-all"
               @mouseenter="stopAutoplay"
               @mouseleave="sliders.length > 1 && startAutoplay()"
             >
               <!-- 1. Skeleton Loading State while fetching slider API -->
-              <div v-if="sliderLoading" class="relative rounded-xl overflow-hidden aspect-4/3 bg-slate-100 animate-pulse flex items-center justify-center">
+              <div v-if="sliderLoading" class="relative rounded-2xl overflow-hidden aspect-4/3 bg-slate-100 animate-pulse flex items-center justify-center">
                 <div class="text-center p-4">
                   <i class="fa-solid fa-trophy text-3xl text-brand-gold/40 mb-2 animate-bounce"></i>
                   <p class="text-xs font-bold text-slate-400">Memuat Foto Juara...</p>
@@ -248,7 +272,7 @@ onUnmounted(() => {
               </div>
 
               <!-- 2. Dynamic Carousel when sliders loaded and length > 0 -->
-              <div v-else-if="sliders.length > 0" class="relative rounded-xl overflow-hidden aspect-4/3 bg-slate-100">
+              <div v-else-if="sliders.length > 0" class="relative rounded-2xl overflow-hidden aspect-4/3 bg-slate-100">
                 <transition-group name="fade-slider">
                   <div
                     v-for="(slide, idx) in sliders"
@@ -263,19 +287,19 @@ onUnmounted(() => {
                     />
 
                     <!-- Overlay Gradient -->
-                    <div class="absolute inset-0 bg-linear-to-t from-slate-950/80 via-slate-900/20 to-transparent"></div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/25 to-transparent"></div>
 
-                    <!-- Slide Info Card Overlay -->
-                    <div class="absolute inset-x-3 bottom-3 p-3 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-lg flex items-center justify-between gap-3">
+                    <!-- Slide Info Card Overlay (Sleek Glassmorphism) -->
+                    <div class="absolute inset-x-3 bottom-3 p-3 sm:p-3.5 bg-white/95 backdrop-blur-md rounded-2xl border border-white/60 shadow-lg flex items-center justify-between gap-3">
                       <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div class="w-9 h-9 rounded-lg bg-amber-50 text-brand-gold border border-amber-200 flex items-center justify-center text-base shrink-0 shadow-xs">
+                        <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center text-sm shrink-0 shadow-2xs">
                           <i class="fa-solid fa-trophy"></i>
                         </div>
-                        <div class="min-w-0 flex-1">
-                          <p class="text-xs font-black text-brand-navy leading-tight truncate">
+                        <div class="min-w-0 flex-1 text-left">
+                          <p class="text-xs font-bold text-slate-900 leading-snug line-clamp-1" :title="slide.title">
                             {{ slide.title }}
                           </p>
-                          <p v-if="slide.student_name" class="text-[11px] font-semibold text-brand-blue truncate mt-0.5">
+                          <p v-if="slide.student_name" class="text-[11px] font-semibold text-blue-600 truncate mt-0.5">
                             <i class="fa-solid fa-user-graduate text-[9px] mr-1"></i> {{ slide.student_name }}
                           </p>
                           <p v-else-if="slide.caption" class="text-[10px] text-slate-500 truncate mt-0.5">
@@ -283,8 +307,8 @@ onUnmounted(() => {
                           </p>
                         </div>
                       </div>
-                      <span class="px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold tracking-wider uppercase shrink-0">
-                        Prestasi Juara
+                      <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold tracking-wider uppercase shrink-0">
+                        Juara
                       </span>
                     </div>
                   </div>
@@ -294,71 +318,71 @@ onUnmounted(() => {
                 <template v-if="sliders.length > 1">
                   <button
                     @click="prevSlide"
-                    class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-brand-navy text-white flex items-center justify-center text-xs backdrop-blur-xs shadow-md transition-all opacity-80 group-hover:opacity-100 cursor-pointer z-10"
+                    class="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white flex items-center justify-center text-xs backdrop-blur-xs shadow-md transition-all opacity-80 group-hover:opacity-100 cursor-pointer z-10"
                     title="Sebelumnya"
                   >
                     <i class="fa-solid fa-chevron-left"></i>
                   </button>
                   <button
                     @click="nextSlide"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-brand-navy text-white flex items-center justify-center text-xs backdrop-blur-xs shadow-md transition-all opacity-80 group-hover:opacity-100 cursor-pointer z-10"
+                    class="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white flex items-center justify-center text-xs backdrop-blur-xs shadow-md transition-all opacity-80 group-hover:opacity-100 cursor-pointer z-10"
                     title="Berikutnya"
                   >
                     <i class="fa-solid fa-chevron-right"></i>
                   </button>
 
                   <!-- Dot Indicators -->
-                  <div class="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-slate-900/50 backdrop-blur-xs px-2 py-1 rounded-full border border-white/20">
+                  <div class="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-slate-900/60 backdrop-blur-xs px-2.5 py-1 rounded-full border border-white/20">
                     <button
                       v-for="(_, index) in sliders"
                       :key="index"
                       @click="goToSlide(index)"
                       :class="[
                         'h-1.5 rounded-full transition-all duration-300 cursor-pointer',
-                        currentSlide === index ? 'w-5 bg-brand-gold' : 'w-1.5 bg-white/60 hover:bg-white'
+                        currentSlide === index ? 'w-5 bg-amber-400' : 'w-1.5 bg-white/60 hover:bg-white'
                       ]"
                     ></button>
                   </div>
                 </template>
               </div>
 
-              <!-- 3. Fallback Default Showcase Image (Hanya tampil jika database slider kosong setelah API selesai memuat) -->
-              <div v-else class="relative rounded-xl overflow-hidden aspect-4/3 bg-slate-100">
+              <!-- 3. Fallback Default Showcase Image -->
+              <div v-else class="relative rounded-2xl overflow-hidden aspect-4/3 bg-slate-100">
                 <img
                   src="/img/students-trophy.jpg"
                   alt="Murid Berprestasi Membawa Piala"
                   class="w-full h-full object-cover"
                 />
-                <div class="absolute inset-x-3 bottom-3 p-3 bg-white/95 backdrop-blur-xs rounded-xl border border-slate-200/90 shadow-sm flex items-center justify-between gap-2">
+                <div class="absolute inset-x-3 bottom-3 p-3 bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-200/90 shadow-sm flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-brand-gold border border-amber-200 flex items-center justify-center text-sm shrink-0">
+                    <div class="w-8 h-8 rounded-xl bg-amber-50 text-brand-gold border border-amber-200 flex items-center justify-center text-sm shrink-0">
                       <i class="fa-solid fa-trophy"></i>
                     </div>
                     <div>
-                      <p class="text-xs font-black text-brand-navy leading-tight">Portofolio Prestasi Resmi</p>
+                      <p class="text-xs font-black text-slate-900 leading-tight">Portofolio Prestasi Resmi</p>
                       <p class="text-[10px] text-slate-500">Arsip permanen buku induk siswa</p>
                     </div>
                   </div>
-                  <span class="px-2 py-0.5 rounded-sm bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold tracking-wider font-mono uppercase shrink-0">
+                  <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold tracking-wider uppercase shrink-0">
                     Valid
                   </span>
                 </div>
               </div>
 
-              <!-- Real Benefits summary footer -->
-              <div class="flex items-center justify-between text-[11px] text-slate-600 pt-3 px-2 pb-1">
-                <span class="flex items-center gap-1.5 text-brand-navy font-semibold">
-                  <i class="fa-solid fa-medal text-brand-gold"></i>
-                  Rekam Prestasi
-                </span>
-                <span class="flex items-center gap-1.5 text-brand-navy font-semibold">
-                  <i class="fa-solid fa-file-circle-check text-brand-blue"></i>
-                  Dispensasi KBM
-                </span>
-                <span class="flex items-center gap-1.5 text-brand-navy font-semibold">
-                  <i class="fa-solid fa-qrcode text-emerald-600"></i>
-                  Scan 1 Detik
-                </span>
+              <!-- Micro Feature Badges Under Photo Slider -->
+              <div class="grid grid-cols-3 gap-2 pt-3 px-1">
+                <div class="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50/80 border border-slate-200/60 text-[11px] font-bold text-slate-700">
+                  <i class="fa-solid fa-trophy text-amber-500 text-xs"></i>
+                  <span class="truncate">Rekam Prestasi</span>
+                </div>
+                <div class="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50/80 border border-slate-200/60 text-[11px] font-bold text-slate-700">
+                  <i class="fa-solid fa-file-shield text-blue-600 text-xs"></i>
+                  <span class="truncate">Dispensasi KBM</span>
+                </div>
+                <div class="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50/80 border border-slate-200/60 text-[11px] font-bold text-slate-700">
+                  <i class="fa-solid fa-qrcode text-emerald-600 text-xs"></i>
+                  <span class="truncate">Scan QR 1 Detik</span>
+                </div>
               </div>
             </div>
           </div>

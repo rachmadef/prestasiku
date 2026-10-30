@@ -21,6 +21,9 @@ class PublicVerificationController extends Controller
      */
     public function verify(string $publicId): JsonResponse
     {
+        $cleanId = trim(strtoupper($publicId));
+        $cleanId = preg_replace('/[\s_]+/', '-', $cleanId);
+
         $achievement = Achievement::with([
             'school:id,name,npsn,educational_level,city,province',
             'competition:id,title,level,organizer_id',
@@ -28,15 +31,29 @@ class PublicVerificationController extends Controller
             'student.user:id,name',
             'documents',
         ])
-            ->where('public_id', $publicId)
-            ->where('status', 'verified')
+            ->where('public_id', $cleanId)
             ->first();
 
         if (! $achievement) {
             return response()->json([
                 'success' => false,
-                'message' => 'Prestasi tidak ditemukan atau belum diverifikasi resmi oleh pihak sekolah.',
+                'message' => 'Prestasi dengan kode ID tersebut tidak ditemukan di database sekolah.',
             ], 404);
+        }
+
+        if ($achievement->status !== 'verified') {
+            $statusText = match ($achievement->status) {
+                'pending_verification' => 'saat ini MASIH MENUNGGU VERIFIKASI RESMI dari pihak sekolah (Admin / Kesiswaan). QR Sertifikat publik belum diterbitkan.',
+                'rejected' => 'telah DITOLAK atau tidak disahkan oleh pihak sekolah.',
+                default => 'masih berstatus draft dan belum diverifikasi.',
+            };
+
+            return response()->json([
+                'success' => false,
+                'status' => $achievement->status,
+                'achievement_title' => $achievement->title,
+                'message' => "Prestasi '{$achievement->title}' terdata di sistem sekolah, namun {$statusText}",
+            ], 422);
         }
 
         $isPublic = (bool) $achievement->is_public;
@@ -96,7 +113,10 @@ class PublicVerificationController extends Controller
      */
     public function qr(string $publicId): Response
     {
-        $achievement = Achievement::where('public_id', $publicId)
+        $cleanId = trim(strtoupper($publicId));
+        $cleanId = preg_replace('/[\s_]+/', '-', $cleanId);
+
+        $achievement = Achievement::where('public_id', $cleanId)
             ->where('status', 'verified')
             ->firstOrFail();
 

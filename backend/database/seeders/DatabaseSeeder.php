@@ -2,9 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -18,17 +16,8 @@ class DatabaseSeeder extends Seeder
         // 1. Seed Roles & Permissions (RBAC)
         $this->call(RoleAndPermissionSeeder::class);
 
-        // 2. Seed Super Administrator
-        $superAdmin = User::create([
-            'name' => 'Super Administrator',
-            'email' => 'superadmin@prestasiku.id',
-            'username' => 'superadmin',
-            'phone' => '081100000001',
-            'password' => Hash::make('password'),
-            'must_change_password' => false,
-            'status' => 'active',
-        ]);
-        $superAdmin->assignRole('super_admin');
+        // 2. Seed Super Administrator & Admin Sekolah
+        $this->call(AdminSeeder::class);
 
         // 3. Seed Master Kategori Kompetisi
         $this->call(CompetitionCategorySeeder::class);

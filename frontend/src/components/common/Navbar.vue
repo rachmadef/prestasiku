@@ -19,52 +19,54 @@ function handleLogout() {
   router.push('/login')
 }
 </script>
+
 <template>
-  <header class="sticky top-0 z-40 w-full bg-brand-navy border-b border-white/10 shadow-md">
+  <!-- Full-width Sticky Navy Navbar (Menyatu Penuh Tanpa Terputus) -->
+  <header class="sticky top-0 z-50 w-full bg-brand-navy border-b border-white/10 shadow-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-18">
-        <!-- Brand Logo (White Version for Blue Navbar) -->
+      <div class="flex items-center justify-between h-16 sm:h-[68px]">
+        <!-- Brand Logo (White Version for Brand Navy Navbar) -->
         <router-link to="/" class="flex items-center gap-2.5 sm:gap-3 group focus:outline-hidden">
           <img
             src="/img/icon-white.png"
             alt="PrestasiKu Icon"
-            class="hidden md:block h-9 w-auto object-contain transition-transform group-hover:scale-105"
+            class="h-8 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105"
           />
           <img
             src="/img/text-white.png"
             alt="PrestasiKu"
-            class="h-6 sm:h-6.5 w-auto object-contain"
+            class="h-5 sm:h-6 w-auto object-contain"
           />
         </router-link>
 
-        <!-- Desktop Navigation Links -->
+        <!-- Desktop Navigation Links (Clean & Unified) -->
         <nav class="hidden md:flex items-center gap-1 lg:gap-2">
           <router-link
             to="/"
             active-class="text-brand-gold font-bold bg-white/10"
-            class="px-3.5 py-2 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
+            class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
           >
             Beranda
           </router-link>
           <router-link
             to="/competitions"
             active-class="text-brand-gold font-bold bg-white/10"
-            class="px-3.5 py-2 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
+            class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
           >
             Katalog Kompetisi
           </router-link>
           <router-link
             to="/verify"
             active-class="text-brand-gold font-bold bg-white/10"
-            class="px-3.5 py-2 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
+            class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
           >
-            Cek QR Prestasi
+            Cek QR
           </router-link>
         </nav>
 
         <!-- Desktop Right Actions -->
         <div class="hidden md:flex items-center gap-3">
-          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-300 bg-white/10 rounded-xl border border-white/15">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-300 bg-white/10 rounded-xl border border-white/15 hidden lg:inline-flex">
             <i class="fa-solid fa-building-columns text-amber-400"></i>
             MA Unggulan K.H. Abd. Wahab Hasbulloh
           </span>
@@ -72,15 +74,16 @@ function handleLogout() {
           <template v-if="authStore.isAuthenticated">
             <router-link
               :to="getDashboardRoute()"
-              class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-brand-navy bg-brand-gold hover:bg-[#e0a600] rounded-xl shadow-xs transition-all hover:shadow-md"
+              class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-brand-navy bg-brand-gold hover:bg-[#e0a600] rounded-xl shadow-xs transition-all hover:shadow-md cursor-pointer"
             >
               <i class="fa-solid fa-gauge-high"></i>
-              Dashboard ({{ authStore.user?.name.split(' ')[0] }})
+              <span>Dashboard ({{ authStore.user?.name.split(' ')[0] }})</span>
             </router-link>
+
             <button
               type="button"
               @click="handleLogout"
-              class="w-9 h-9 flex items-center justify-center rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              class="w-9 h-9 flex items-center justify-center rounded-xl text-slate-300 hover:text-rose-400 hover:bg-white/10 transition-colors cursor-pointer"
               title="Keluar"
             >
               <i class="fa-solid fa-arrow-right-from-bracket"></i>
@@ -90,27 +93,27 @@ function handleLogout() {
           <template v-else>
             <router-link
               to="/login"
-              class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-brand-navy bg-brand-gold hover:bg-[#e0a600] rounded-xl shadow-xs transition-all hover:shadow-md"
+              class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-brand-navy bg-brand-gold hover:bg-[#e0a600] rounded-xl shadow-xs transition-all hover:shadow-md cursor-pointer"
             >
               <i class="fa-solid fa-arrow-right-to-bracket"></i>
-              Masuk
+              <span>Masuk Portal</span>
             </router-link>
           </template>
         </div>
 
-        <!-- Mobile Three Dots Menu Trigger (as in reference) -->
+        <!-- Mobile Menu Trigger Button -->
         <div class="relative flex items-center md:hidden">
           <button
             type="button"
             @click="mobileMenuOpen = !mobileMenuOpen"
             class="w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/15 active:bg-white/20 focus:outline-hidden transition-colors cursor-pointer"
             aria-label="Menu Opsi"
-            :title="mobileMenuOpen ? 'Tutup menu' : 'Menu opsi'"
+            :title="mobileMenuOpen ? 'Tutup menu' : 'Buka menu'"
           >
-            <i :class="mobileMenuOpen ? 'fa-solid fa-xmark text-lg' : 'fa-solid fa-ellipsis-vertical text-xl'"></i>
+            <i :class="mobileMenuOpen ? 'fa-solid fa-xmark text-lg' : 'fa-solid fa-bars text-xl'"></i>
           </button>
 
-          <!-- Floating Three-Dots Popup Card (Right-aligned, as in reference) -->
+          <!-- Floating Mobile Menu Card -->
           <Transition
             enter-active-class="transition duration-150 ease-out origin-top-right"
             enter-from-class="opacity-0 scale-95 -translate-y-1"
@@ -151,9 +154,8 @@ function handleLogout() {
                   class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-brand-navy hover:bg-slate-50 transition-colors"
                 >
                   <i class="fa-solid fa-qrcode w-4 text-center text-brand-blue"></i>
-                  <span>Cek QR Prestasi</span>
+                  <span>Cek QR</span>
                 </router-link>
-
               </div>
 
               <div class="mt-2 pt-2 border-t border-slate-100">
@@ -201,10 +203,10 @@ function handleLogout() {
       </div>
     </div>
 
-    <!-- Backdrop to close Three-Dots popup when clicking outside -->
+    <!-- Backdrop to close mobile menu when clicking outside -->
     <div
       v-if="mobileMenuOpen"
-      class="fixed inset-0 z-30 md:hidden bg-black/10"
+      class="fixed inset-0 z-30 md:hidden bg-black/20"
       @click="mobileMenuOpen = false"
     ></div>
   </header>

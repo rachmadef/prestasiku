@@ -51,7 +51,7 @@ async function fetchData() {
   try {
     const [dispRes, studRes, schemaRes] = await Promise.all([
       api.get('/school/dispensations'),
-      api.get('/school/students').catch(() => ({ data: { data: [] } })),
+      api.get('/school/students?all=1').catch(() => ({ data: { data: [] } })),
       api.get('/school/dispensations/form-schema').catch(() => ({ data: { data: { schema: [] } } })),
     ])
     dispensations.value = extractList(dispRes.data.data)

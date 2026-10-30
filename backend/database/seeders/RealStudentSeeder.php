@@ -29,11 +29,14 @@ class RealStudentSeeder extends Seeder
             ['npsn' => '20579998'],
             [
                 'name' => 'MA Unggulan K.H. Abd. Wahab Hasbulloh',
+                'educational_level' => 'slta',
+                'province' => 'Jawa Timur',
+                'city' => 'Jombang',
                 'address' => 'Tambakberas, Jombang',
                 'phone' => '0321-123456',
                 'email' => 'info@mau-tb.sch.id',
-                'city' => 'Jombang',
-                'status' => 'active',
+                'status' => 'verified',
+                'verified_at' => now(),
             ]
         );
 
@@ -52,6 +55,7 @@ class RealStudentSeeder extends Seeder
 
         $existingNiss = Student::where('school_id', $school->id)->pluck('nis')->toArray();
         $nisCounter = 1000;
+        $defaultPassword = Hash::make('1234');
 
         foreach ($sheetMap as $sheetName => $defaultGrade) {
             $sheet = $spreadsheet->getSheetByName($sheetName);
@@ -137,7 +141,7 @@ class RealStudentSeeder extends Seeder
                         'email' => $email,
                         'username' => $username,
                         'school_id' => $school->id,
-                        'password' => Hash::make('1234'),
+                        'password' => $defaultPassword,
                         'must_change_password' => true,
                         'status' => 'active',
                     ]);
